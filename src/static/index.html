@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Realtime Chat</title>
+<title>LESogram</title>
 <style>
 :root {
     --bg: #0f172a;
@@ -29,11 +29,10 @@ body {
 }
 
 .container {
-    width: 780px;
-    max-width: 100%;
+    width: min(1100px, 100%);
     height: calc(100vh - 48px);
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 340px minmax(0, 1fr);
     gap: 16px;
 }
 
@@ -196,13 +195,90 @@ button {
     width: auto;
     padding: 8px 12px;
 }
+
+/* Laptops and smaller desktops */
+@media (max-width: 1200px) {
+    body {
+        padding: 16px;
+    }
+
+    .container {
+        height: calc(100vh - 32px);
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 12px;
+    }
+}
+
+/* Tablets */
+@media (max-width: 900px) {
+    body {
+        padding: 12px;
+        overflow-y: auto;
+    }
+
+    .container {
+        height: calc(100vh - 24px);
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(280px, 42vh) minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .panel,
+    .chat-panel {
+        border-radius: 14px;
+    }
+
+    .msg {
+        max-width: 92%;
+    }
+}
+
+/* Smartphones */
+@media (max-width: 600px) {
+    body {
+        padding: 8px;
+    }
+
+    .container {
+        min-height: calc(100vh - 16px);
+        height: auto;
+        grid-template-rows: auto minmax(360px, 1fr);
+        gap: 8px;
+    }
+
+    .header {
+        padding: 12px;
+    }
+
+    .section {
+        padding: 12px;
+    }
+
+    .topbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .input-row {
+        flex-wrap: wrap;
+        padding: 10px;
+    }
+
+    .input-row button {
+        width: 100% !important;
+    }
+
+    .msg {
+        max-width: 100%;
+    }
+}
 </style>
 </head>
 <body>
 
 <div class="container">
     <div class="panel">
-        <div class="header">Аккаунт и комнаты</div>
+        <div class="header">LESogram</div>
 
         <div class="section" id="authSection">
             <input id="username" placeholder="Username" />
