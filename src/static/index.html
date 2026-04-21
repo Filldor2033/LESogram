@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LESogram</title>
-
+<title>Realtime Chat</title>
 <style>
 :root {
     --bg: #0f172a;
@@ -14,7 +13,6 @@
     --muted: #9ca3af;
     --danger: #ef4444;
 }
-
 * { box-sizing: border-box; }
 
 body {
@@ -22,66 +20,80 @@ body {
     font-family: Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 20px;
+    align-items: flex-start;
+    padding: 24px;
 }
 
 .container {
-    width: 460px;
+    width: 780px;
+    max-width: 100%;
+    height: calc(100vh - 48px);
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 16px;
+}
+
+.panel, .chat-panel {
     background: var(--card);
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    min-height: 0;
+}
+
+.panel {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+}
+
+.chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .header {
-    padding: 15px;
     background: #020617;
+    padding: 14px 16px;
     font-weight: bold;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-shrink: 0;
 }
 
-.login {
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.section {
+    padding: 16px;
 }
 
-.login input,
-.input-row input {
+#roomsSection {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+#roomsList {
+    overflow-y: auto;
+}
+
+input, button {
+    width: 100%;
     padding: 10px;
-    border: none;
     border-radius: 8px;
+    border: none;
+}
+
+input {
     background: #020617;
     color: white;
+    margin-bottom: 10px;
 }
 
-.login-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.login button,
-.input-row button,
-.logout-btn {
+button {
     background: var(--accent);
-    border: none;
-    padding: 10px;
-    border-radius: 8px;
     cursor: pointer;
     font-weight: bold;
-}
-
-.logout-btn {
-    padding: 6px 10px;
 }
 
 .secondary {
@@ -89,19 +101,47 @@ body {
     color: white;
 }
 
+.status {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 8px;
+}
+
+.error {
+    color: var(--danger);
+}
+
+.room-item {
+    background: #0b1220;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.room-title {
+    font-weight: bold;
+}
+
+.room-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 6px 0 10px;
+}
+
 .chat {
-    height: 380px;
+    flex: 1;
     overflow-y: auto;
-    padding: 10px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
 }
 
 .msg {
-    padding: 8px 12px;
+    max-width: 80%;
+    padding: 10px 12px;
     border-radius: 12px;
-    max-width: 85%;
     word-break: break-word;
 }
 
@@ -118,10 +158,8 @@ body {
 
 .system {
     align-self: center;
-    font-size: 12px;
     color: var(--muted);
-    background: transparent;
-    padding: 4px 8px;
+    font-size: 12px;
 }
 
 .meta {
@@ -133,11 +171,13 @@ body {
 .input-row {
     display: flex;
     gap: 8px;
-    padding: 10px;
+    padding: 12px;
     border-top: 1px solid #1f2937;
+    flex-shrink: 0;
 }
 
 .input-row input {
+    margin: 0;
     flex: 1;
 }
 
@@ -145,68 +185,90 @@ body {
     display: none;
 }
 
-.status {
-    padding: 8px 12px;
-    font-size: 13px;
-    color: var(--muted);
-    border-top: 1px solid #1f2937;
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
 }
 
-.error {
-    color: var(--danger);
+.small-btn {
+    width: auto;
+    padding: 8px 12px;
 }
 </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header">
-        <span>💬 LESogram</span>
-        <button id="logoutBtn" class="logout-btn hidden" onclick="logout()">Exit</button>
-    </div>
+    <div class="panel">
+        <div class="header">Аккаунт и комнаты</div>
 
-    <div id="login" class="login">
-        <input id="username" placeholder="Username" />
-        <input id="password" type="password" placeholder="Password" />
-        <input id="room" placeholder="Room" />
-
-        <div class="login-actions">
+        <div class="section" id="authSection">
+            <input id="username" placeholder="Username" />
+            <input id="password" type="password" placeholder="Password" />
             <button onclick="auth('login')">Login</button>
+            <div style="height:8px"></div>
             <button class="secondary" onclick="auth('register')">Register</button>
+            <div id="authStatus" class="status"></div>
         </div>
 
-        <div id="authStatus" class="status"></div>
+        <div class="section hidden" id="roomsSection">
+            <div class="topbar">
+                <div><b id="whoami"></b></div>
+                <button class="secondary small-btn" onclick="logout()">Exit</button>
+            </div>
+
+            <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
+
+            <input id="newRoomName" placeholder="New room name" />
+            <input id="newRoomPassword" type="password" placeholder="Room password" />
+            <button onclick="createRoom()">Create room</button>
+
+            <div id="roomStatus" class="status"></div>
+
+            <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
+
+            <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
+            <div style="height:10px"></div>
+            <div id="roomsList"></div>
+        </div>
     </div>
 
-    <div id="chatUI" class="hidden">
+    <div class="chat-panel">
+        <div class="header" id="chatHeader">Чат не выбран</div>
         <div id="chat" class="chat"></div>
-
         <div class="input-row">
-            <input id="message" placeholder="Type message..."
-                   onkeydown="if(event.key==='Enter') sendMessage()" />
-            <button onclick="sendMessage()">➤</button>
+            <input id="message" placeholder="Type message..." onkeydown="if(event.key==='Enter') sendMessage()" />
+            <button style="width:120px" onclick="sendMessage()">Send</button>
         </div>
-
-        <div id="chatStatus" class="status">Disconnected</div>
     </div>
 </div>
 
 <script>
-let ws = null;
-let currentUser = null;
-let currentRoom = null;
 let token = localStorage.getItem("token") || "";
+let currentUser = localStorage.getItem("username") || "";
+let currentRoom = "";
+let currentRoomToken = "";
+let ws = null;
 
-function setStatus(text, isError = false, target = "authStatus") {
-    const el = document.getElementById(target);
+function setStatus(id, text, isError=false) {
+    const el = document.getElementById(id);
     el.textContent = text;
     el.className = "status" + (isError ? " error" : "");
 }
 
-function formatTime(isoString) {
-    if (!isoString) return "";
-    const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function authHeaders() {
+    return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+    };
+}
+
+function formatTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
 }
 
 function addMessage(payload) {
@@ -217,17 +279,17 @@ function addMessage(payload) {
         div.className = "msg system";
         div.innerText = payload.text;
     } else {
-        const isMe = payload.username === currentUser;
-        div.className = "msg " + (isMe ? "me" : "other");
+        const mine = payload.username === currentUser;
+        div.className = "msg " + (mine ? "me" : "other");
 
-        const content = document.createElement("div");
-        content.innerText = `${payload.username}: ${payload.text}`;
+        const text = document.createElement("div");
+        text.innerText = `${payload.username}: ${payload.text}`;
 
         const meta = document.createElement("div");
         meta.className = "meta";
         meta.innerText = formatTime(payload.timestamp);
 
-        div.appendChild(content);
+        div.appendChild(text);
         div.appendChild(meta);
     }
 
@@ -235,88 +297,175 @@ function addMessage(payload) {
     chat.scrollTop = chat.scrollHeight;
 }
 
+function clearChat() {
+    document.getElementById("chat").innerHTML = "";
+}
+
 async function auth(mode) {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
-    const room = document.getElementById("room").value.trim();
 
-    if (!username || !password || !room) {
-        setStatus("Fill all fields", true);
+    if (!username || !password) {
+        setStatus("authStatus", "Fill username and password", true);
         return;
     }
 
+    const res = await fetch(`/${mode}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        setStatus("authStatus", data.detail || "Auth failed", true);
+        return;
+    }
+
+    token = data.access_token;
     currentUser = username;
-    currentRoom = room;
 
-    setStatus(mode === "login" ? "Logging in..." : "Registering...");
+    localStorage.setItem("token", token);
+    localStorage.setItem("username", username);
 
-    try {
-        const res = await fetch(`/${mode}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
+    document.getElementById("authSection").classList.add("hidden");
+    document.getElementById("roomsSection").classList.remove("hidden");
+    document.getElementById("whoami").innerText = username;
 
-        const data = await res.json();
+    setStatus("authStatus", "");
+    await loadRooms();
+}
 
-        if (!res.ok) {
-            setStatus(data.detail || "Auth failed", true);
-            return;
+async function loadRooms() {
+    const res = await fetch("/rooms", {
+        headers: {
+            "Authorization": "Bearer " + token
         }
+    });
 
-        token = data.access_token;
-        localStorage.setItem("token", token);
+    const data = await res.json();
+    const list = document.getElementById("roomsList");
+    list.innerHTML = "";
 
-        document.getElementById("login").classList.add("hidden");
-        document.getElementById("chatUI").classList.remove("hidden");
-        document.getElementById("logoutBtn").classList.remove("hidden");
+    if (!res.ok) {
+        setStatus("roomStatus", data.detail || "Cannot load rooms", true);
+        return;
+    }
 
-        document.getElementById("chat").innerHTML = "";
+    if (!data.length) {
+        list.innerHTML = `<div class="status">No rooms yet</div>`;
+        return;
+    }
 
-        await loadMessages();
-        connectWS();
-
-    } catch (err) {
-        setStatus("Network error", true);
+    for (const room of data) {
+        const item = document.createElement("div");
+        item.className = "room-item";
+        item.innerHTML = `
+            <div class="room-title">${room.name}</div>
+            <div class="room-meta">
+                creator: ${room.created_by}<br>
+                online: ${room.online}
+            </div>
+            <input type="password" placeholder="Room password" id="pwd_${room.name}">
+            <button onclick="joinRoom('${room.name}')">Join</button>
+        `;
+        list.appendChild(item);
     }
 }
 
-async function loadMessages() {
-    const res = await fetch(`/messages/${encodeURIComponent(currentRoom)}`);
-    const messages = await res.json();
+async function createRoom() {
+    const name = document.getElementById("newRoomName").value.trim();
+    const password = document.getElementById("newRoomPassword").value.trim();
 
-    messages.forEach(m => {
+    if (!name || !password) {
+        setStatus("roomStatus", "Fill room name and password", true);
+        return;
+    }
+
+    const res = await fetch("/rooms", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ name, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        setStatus("roomStatus", data.detail || "Cannot create room", true);
+        return;
+    }
+
+    setStatus("roomStatus", `Room "${name}" created`);
+    document.getElementById("newRoomName").value = "";
+    document.getElementById("newRoomPassword").value = "";
+    await loadRooms();
+}
+
+async function joinRoom(roomName) {
+    const pwdInput = document.getElementById(`pwd_${roomName}`);
+    const password = pwdInput.value.trim();
+
+    if (!password) {
+        setStatus("roomStatus", "Enter room password", true);
+        return;
+    }
+
+    const res = await fetch("/rooms/join", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ room: roomName, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        setStatus("roomStatus", data.detail || "Cannot join room", true);
+        return;
+    }
+
+    currentRoom = roomName;
+    currentRoomToken = data.room_token;
+    document.getElementById("chatHeader").innerText = `Комната: ${roomName}`;
+
+    clearChat();
+    await loadMessages();
+    connectWS();
+    setStatus("roomStatus", `Joined room "${roomName}"`);
+}
+
+async function loadMessages() {
+    const res = await fetch(`/messages/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+        setStatus("roomStatus", data.detail || "Cannot load messages", true);
+        return;
+    }
+
+    for (const m of data) {
         addMessage({
             type: "message",
             username: m.username,
             text: m.text,
-            room: m.room,
             timestamp: m.timestamp
         });
-    });
+    }
 }
 
 function connectWS() {
+    if (ws) {
+        ws.close();
+    }
+
     const protocol = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(
-        `${protocol}://${location.host}/ws/${encodeURIComponent(currentRoom)}?token=${encodeURIComponent(token)}&username=${encodeURIComponent(currentUser)}`
+        `${protocol}://${location.host}/ws/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`
     );
-
-    ws.onopen = () => {
-        setStatus(`Connected to room: ${currentRoom}`, false, "chatStatus");
-    };
 
     ws.onmessage = (event) => {
         const payload = JSON.parse(event.data);
         addMessage(payload);
-    };
-
-    ws.onclose = () => {
-        setStatus("Disconnected", true, "chatStatus");
-    };
-
-    ws.onerror = () => {
-        setStatus("WebSocket error", true, "chatStatus");
     };
 }
 
@@ -331,21 +480,20 @@ function sendMessage() {
 }
 
 function logout() {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
+    if (ws) ws.close();
+    ws = null;
+    token = "";
+    currentUser = "";
+    currentRoom = "";
+    currentRoomToken = "";
 
     localStorage.removeItem("token");
-    token = "";
-    currentUser = null;
-    currentRoom = null;
+    localStorage.removeItem("username");
 
-    document.getElementById("chatUI").classList.add("hidden");
-    document.getElementById("login").classList.remove("hidden");
-    document.getElementById("logoutBtn").classList.add("hidden");
-    document.getElementById("chat").innerHTML = "";
-    setStatus("Logged out");
+    document.getElementById("authSection").classList.remove("hidden");
+    document.getElementById("roomsSection").classList.add("hidden");
+    document.getElementById("chatHeader").innerText = "Чат не выбран";
+    clearChat();
 }
 </script>
 

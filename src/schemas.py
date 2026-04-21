@@ -1,50 +1,32 @@
 from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
 
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
-    password: str = Field(min_length=4, max_length=128)
+    password: str = Field(min_length=4, max_length=72)
 
 class LoginRequest(BaseModel):
     username: str
-    password: str
+    password: str = Field(min_length=4, max_length=72)
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-class MessageResponse(BaseModel):
-    username: str
-    text: str
-    room: str
-    timestamp: datetime
+class CreateRoomRequest(BaseModel):
+    name: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=1, max_length=72)
 
-class WSMessage(BaseModel):
-    type: str
-    username: str | None = None
-    text: str | None = None
-    room: str | None = None
-    timestamp: str | None = None
-
-class RegisterRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=50)
-    password: str = Field(min_length=4, max_length=128)
-
-    @field_validator("password")
+    @field_validator("name")
     @classmethod
-    def validate_password_bytes(cls, v: str):
-        if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password is too long for bcrypt (max 72 UTF-8 bytes)")
+    def validate_name(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError("Room name cannot be empty")
         return v
 
+class JoinRoomRequest(BaseModel):
+    room: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=1, max_length=72)
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-    @field_validator("password")
-    @classmethod
-    def validate_password_bytes(cls, v: str):
-        if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password is too long for bcrypt (max 72 UTF-8 bytes)")
-        return v
+class SendMessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
