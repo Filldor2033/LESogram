@@ -447,22 +447,47 @@ async function loadRooms() {
     }
 
     if (!data.length) {
-        list.innerHTML = `<div class="status">No rooms yet</div>`;
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No rooms yet";
+        list.appendChild(empty);
         return;
     }
 
     for (const room of data) {
         const item = document.createElement("div");
         item.className = "room-item";
-        item.innerHTML = `
-            <div class="room-title">${room.name}</div>
-            <div class="room-meta">
-                creator: ${room.created_by}<br>
-                online: ${room.online}
-            </div>
-            <input type="password" placeholder="Room password" id="pwd_${room.name}">
-            <button onclick="joinRoom('${room.name}')">Join</button>
-        `;
+
+        const title = document.createElement("div");
+        title.className = "room-title";
+        title.textContent = room.name;
+
+        const meta = document.createElement("div");
+        meta.className = "room-meta";
+        meta.innerHTML = ""; // можно вообще не использовать, ниже безопаснее через textContent
+
+        const creatorLine = document.createElement("div");
+        creatorLine.textContent = `creator: ${room.created_by}`;
+
+        const onlineLine = document.createElement("div");
+        onlineLine.textContent = `online: ${room.online}`;
+
+        const input = document.createElement("input");
+        input.type = "password";
+        input.placeholder = "Room password";
+
+        const button = document.createElement("button");
+        button.textContent = "Join";
+        button.addEventListener("click", () => joinRoom(room.name, input));
+
+        meta.appendChild(creatorLine);
+        meta.appendChild(onlineLine);
+
+        item.appendChild(title);
+        item.appendChild(meta);
+        item.appendChild(input);
+        item.appendChild(button);
+
         list.appendChild(item);
     }
 }
@@ -495,8 +520,7 @@ async function createRoom() {
     await loadRooms();
 }
 
-async function joinRoom(roomName) {
-    const pwdInput = document.getElementById(`pwd_${roomName}`);
+async function joinRoom(roomName, pwdInput) {
     const password = pwdInput.value.trim();
 
     if (!password) {
