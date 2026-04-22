@@ -196,6 +196,13 @@ button {
     padding: 8px 12px;
 }
 
+.chat-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
 /* Laptops and smaller desktops */
 @media (max-width: 1200px) {
     body {
@@ -271,6 +278,11 @@ button {
     .msg {
         max-width: 100%;
     }
+
+    .chat-topbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
 }
 </style>
 </head>
@@ -312,7 +324,12 @@ button {
     </div>
 
     <div class="chat-panel">
-        <div class="header" id="chatHeader">Чат не выбран</div>
+        <div class="header">
+            <div class="chat-topbar">
+                <span id="chatHeader">Чат не выбран</span>
+                <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit chat</button>
+            </div>
+        </div>
         <div id="chat" class="chat"></div>
         <div class="input-row">
             <input id="message" placeholder="Type message..." onkeydown="if(event.key==='Enter') sendMessage()" />
@@ -503,6 +520,7 @@ async function joinRoom(roomName) {
     currentRoom = roomName;
     currentRoomToken = data.room_token;
     document.getElementById("chatHeader").innerText = `Комната: ${roomName}`;
+    document.getElementById("leaveChatBtn").classList.remove("hidden");
 
     clearChat();
     await loadMessages();
@@ -553,6 +571,21 @@ function sendMessage() {
 
     ws.send(JSON.stringify({ text }));
     input.value = "";
+}
+
+function leaveChat() {
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+
+    currentRoom = "";
+    currentRoomToken = "";
+
+    document.getElementById("chatHeader").innerText = "Чат не выбран";
+    document.getElementById("leaveChatBtn").classList.add("hidden");
+    clearChat();
+    setStatus("roomStatus", "You left the room");
 }
 
 function logout() {
