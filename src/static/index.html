@@ -196,6 +196,18 @@ button {
     padding: 8px 12px;
 }
 
+.rooms-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.rooms-list-title {
+    font-weight: bold;
+}
+
 .chat-topbar {
     display: flex;
     justify-content: space-between;
@@ -317,9 +329,15 @@ button {
 
             <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
 
-            <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
-            <div style="height:10px"></div>
-            <div id="roomsList"></div>
+            <div class="rooms-list-header">
+                <div class="rooms-list-title">Room list</div>
+                <button id="toggleRoomsBtn" class="secondary small-btn" onclick="toggleRoomsList()">Hide list</button>
+            </div>
+            <div id="roomsListSection">
+                <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
+                <div style="height:10px"></div>
+                <div id="roomsList"></div>
+            </div>
         </div>
     </div>
 
@@ -344,6 +362,7 @@ let currentUser = localStorage.getItem("username") || "";
 let currentRoom = "";
 let currentRoomToken = "";
 let ws = null;
+let roomsListCollapsed = false;
 
 function setStatus(id, text, isError=false) {
     const el = document.getElementById(id);
@@ -392,6 +411,20 @@ function addMessage(payload) {
 
 function clearChat() {
     document.getElementById("chat").innerHTML = "";
+}
+
+function setRoomsListCollapsed(collapsed) {
+    roomsListCollapsed = collapsed;
+
+    const roomsListSection = document.getElementById("roomsListSection");
+    const toggleButton = document.getElementById("toggleRoomsBtn");
+
+    roomsListSection.classList.toggle("hidden", collapsed);
+    toggleButton.textContent = collapsed ? "Show list" : "Hide list";
+}
+
+function toggleRoomsList() {
+    setRoomsListCollapsed(!roomsListCollapsed);
 }
 
 async function auth(mode) {
@@ -549,6 +582,7 @@ async function joinRoom(roomName, pwdInput) {
     clearChat();
     await loadMessages();
     connectWS();
+    setRoomsListCollapsed(true);
     setStatus("roomStatus", `Joined room "${roomName}"`);
 }
 
@@ -609,6 +643,7 @@ function leaveChat() {
     document.getElementById("chatHeader").innerText = "Чат не выбран";
     document.getElementById("leaveChatBtn").classList.add("hidden");
     clearChat();
+    setRoomsListCollapsed(false);
     setStatus("roomStatus", "You left the room");
 }
 
@@ -625,6 +660,7 @@ function logout() {
 
     document.getElementById("authSection").classList.remove("hidden");
     document.getElementById("roomsSection").classList.add("hidden");
+    setRoomsListCollapsed(false);
     document.getElementById("chatHeader").innerText = "Чат не выбран";
     clearChat();
 }
