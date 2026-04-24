@@ -223,6 +223,18 @@ def serialize_message(message: Message) -> dict:
     }
 
 
+def build_system_payload(room: str, actor: str, event: str) -> dict:
+    fallback_text = f"{actor} {event}"
+    return {
+        "type": "system",
+        "text": fallback_text,
+        "room": room,
+        "timestamp": datetime.utcnow().isoformat(),
+        "system_event": event,
+        "system_actor": actor,
+    }
+
+
 def save_message(
     db: Session,
     *,
@@ -436,12 +448,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     await manager.connect(websocket, room)
     room_members[room].add(username)
 
-    await manager.broadcast_json({
-        "type": "system",
-        "text": f"{username} joined",
-        "room": room,
-        "timestamp": datetime.utcnow().isoformat(),
-    }, room)
+    await manager.broadcast_json(build_system_payload(room, username, "joined"), room)
 
     try:
         while True:
@@ -472,12 +479,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
             if not room_members[room]:
                 del room_members[room]
 
-        await manager.broadcast_json({
-            "type": "system",
-            "text": f"{username} left",
-            "room": room,
-            "timestamp": datetime.utcnow().isoformat(),
-        }, room)
+        await manager.broadcast_json(build_system_payload(room, username, "left"), room)
 
 
 @app.get("/")

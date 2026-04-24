@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,7 +12,6 @@
     --panel: #020617;
     --accent: #22c55e;
     --accent-2: #16a34a;
-    --accent-soft: rgba(34, 197, 94, 0.16);
     --accent-line: rgba(34, 197, 94, 0.26);
     --text: #e5e7eb;
     --muted: #9ca3af;
@@ -83,6 +82,13 @@ body {
     border-bottom: 1px solid rgba(148,163,184,0.08);
 }
 
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
 .section {
     padding: 18px;
 }
@@ -117,6 +123,38 @@ body {
     font-size: 12px;
     font-weight: normal;
     color: var(--muted);
+}
+
+.lang-switch {
+    display: inline-flex;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(148,163,184,0.10);
+    border: 1px solid rgba(148,163,184,0.08);
+    gap: 4px;
+}
+
+.lang-btn {
+    width: auto;
+    min-width: 52px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--muted-2);
+    box-shadow: none;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+}
+
+.lang-btn:hover {
+    box-shadow: none;
+}
+
+.lang-btn.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #04120a;
+    box-shadow: 0 10px 20px rgba(22, 163, 74, 0.20);
 }
 
 .section-block {
@@ -499,48 +537,6 @@ button:disabled {
     gap: 8px;
 }
 
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(2,6,23,0.72);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    z-index: 20;
-}
-
-.modal-card {
-    width: min(920px, 100%);
-    max-height: min(85vh, 860px);
-    background: #0b1220;
-    border: 1px solid rgba(148,163,184,0.14);
-    border-radius: 18px;
-    box-shadow: 0 18px 50px rgba(0,0,0,0.42);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(148,163,184,0.08);
-}
-
-.modal-title {
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.modal-body {
-    padding: 16px;
-    overflow-y: auto;
-}
-
 .chat-empty {
     margin: auto 0;
     padding: 22px 18px;
@@ -590,8 +586,7 @@ button:disabled {
     }
 
     .panel,
-    .chat-panel,
-    .modal-card {
+    .chat-panel {
         border-radius: 18px;
     }
 
@@ -619,12 +614,11 @@ button:disabled {
 
     .header,
     .section,
-    .composer,
-    .modal-header,
-    .modal-body {
+    .composer {
         padding: 12px;
     }
 
+    .header-row,
     .topbar,
     .chat-topbar,
     .composer-tools,
@@ -633,6 +627,7 @@ button:disabled {
         align-items: flex-start;
     }
 
+    .lang-switch,
     .input-row button,
     .tool-btn {
         width: 100% !important;
@@ -640,10 +635,6 @@ button:disabled {
 
     .msg {
         max-width: 100%;
-    }
-
-    .modal {
-        padding: 10px;
     }
 }
 </style>
@@ -653,91 +644,88 @@ button:disabled {
 <div class="container">
     <div class="panel">
         <div class="header">
-            <div class="brand">
-                <div class="brand-mark"></div>
-                <div class="brand-copy">
-                    <div class="brand-title">LESogram</div>
-                    <div class="brand-subtitle">Fast rooms, live messages, simple sharing</div>
+            <div class="header-row">
+                <div class="brand">
+                    <div class="brand-mark"></div>
+                    <div class="brand-copy">
+                        <div class="brand-title">LESogram</div>
+                        <div class="brand-subtitle" id="brandSubtitle">Fast rooms, live messages, simple sharing</div>
+                    </div>
+                </div>
+                <div class="lang-switch" aria-label="Language switch">
+                    <button id="langEnBtn" class="lang-btn" type="button" onclick="setLanguage('en')">EN</button>
+                    <button id="langRuBtn" class="lang-btn" type="button" onclick="setLanguage('ru')">RU</button>
                 </div>
             </div>
         </div>
 
         <div class="section" id="authSection">
             <div class="section-block">
-                <div class="section-title">Account</div>
-            <input id="username" placeholder="Username" />
-            <input id="password" type="password" placeholder="Password" />
-            <button onclick="auth('login')">Login</button>
-            <div style="height:8px"></div>
-            <button class="secondary" onclick="auth('register')">Register</button>
-            <div id="authStatus" class="status"></div>
+                <div class="section-title" id="authTitle">Account</div>
+                <input id="username" placeholder="Username" />
+                <input id="password" type="password" placeholder="Password" />
+                <button id="loginBtn" onclick="auth('login')">Login</button>
+                <div style="height:8px"></div>
+                <button id="registerBtn" class="secondary" onclick="auth('register')">Register</button>
+                <div id="authStatus" class="status"></div>
             </div>
         </div>
 
         <div class="section hidden" id="roomsSection">
             <div class="topbar">
                 <div><b id="whoami"></b></div>
-                <button class="secondary small-btn" onclick="logout()">Exit</button>
+                <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
             </div>
 
             <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
 
             <div class="section-block">
-            <div class="section-title">Create Room</div>
-            <input id="newRoomName" placeholder="New room name" />
-            <input id="newRoomPassword" type="password" placeholder="Room password" />
-            <button onclick="createRoom()">Create room</button>
-            <div id="roomStatus" class="status"></div>
+                <div class="section-title" id="createRoomTitle">Create Room</div>
+                <input id="newRoomName" placeholder="New room name" />
+                <input id="newRoomPassword" type="password" placeholder="Room password" />
+                <button id="createRoomBtn" onclick="createRoom()">Create room</button>
+                <div id="roomStatus" class="status"></div>
             </div>
 
             <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
 
             <div class="section-block">
-            <div class="section-title-row">
-                <div class="section-title" style="margin-bottom:0">Room List</div>
-                <div class="section-pill" id="roomsCountPill">0 rooms</div>
-            </div>
-            <div class="rooms-list-header">
-                <div class="rooms-list-title">Browse and join</div>
-                <button id="toggleRoomsBtn" class="secondary small-btn" onclick="toggleRoomsList()">Hide list</button>
-            </div>
-            <div id="roomsListSection">
-                <div class="filters">
-                    <input
-                        id="roomSearch"
-                        placeholder="Search by room name..."
-                        oninput="renderRooms()"
-                    />
-
-                    <input
-                        id="creatorSearch"
-                        placeholder="Search by creator..."
-                        oninput="renderRooms()"
-                    />
-
-                    <div class="filters-row">
-                        <select id="onlineFilter" onchange="renderRooms()">
-                            <option value="all">All rooms</option>
-                            <option value="online">Only with online users</option>
-                            <option value="empty">Only empty rooms</option>
-                        </select>
-
-                        <select id="sortRooms" onchange="renderRooms()">
-                            <option value="name_asc">Name A-Z</option>
-                            <option value="name_desc">Name Z-A</option>
-                            <option value="online_desc">Online first</option>
-                            <option value="online_asc">Online last</option>
-                            <option value="creator_asc">Creator A-Z</option>
-                        </select>
-                    </div>
-
-                    <div class="filters-row">
-                        <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
-                        <button class="secondary" onclick="resetRoomFilters()">Reset filters</button>
-                    </div>
+                <div class="section-title-row">
+                    <div class="section-title" id="roomListTitle" style="margin-bottom:0">Room List</div>
+                    <div class="section-pill" id="roomsCountPill">0 rooms</div>
                 </div>
-                <div id="roomsList"></div>
-            </div>
+                <div class="rooms-list-header">
+                    <div class="rooms-list-title" id="roomListSubtitle">Browse and join</div>
+                    <button id="toggleRoomsBtn" class="secondary small-btn" onclick="toggleRoomsList()">Hide list</button>
+                </div>
+                <div id="roomsListSection">
+                    <div class="filters">
+                        <input id="roomSearch" placeholder="Search by room name..." oninput="renderRooms()" />
+                        <input id="creatorSearch" placeholder="Search by creator..." oninput="renderRooms()" />
+
+                        <div class="filters-row">
+                            <select id="onlineFilter" onchange="renderRooms()">
+                                <option id="onlineFilterAll" value="all">All rooms</option>
+                                <option id="onlineFilterOnline" value="online">Only with online users</option>
+                                <option id="onlineFilterEmpty" value="empty">Only empty rooms</option>
+                            </select>
+
+                            <select id="sortRooms" onchange="renderRooms()">
+                                <option id="sortNameAsc" value="name_asc">Name A-Z</option>
+                                <option id="sortNameDesc" value="name_desc">Name Z-A</option>
+                                <option id="sortOnlineDesc" value="online_desc">Online first</option>
+                                <option id="sortOnlineAsc" value="online_asc">Online last</option>
+                                <option id="sortCreatorAsc" value="creator_asc">Creator A-Z</option>
+                            </select>
+                        </div>
+
+                        <div class="filters-row">
+                            <button id="refreshRoomsBtn" class="secondary" onclick="loadRooms()">Refresh rooms</button>
+                            <button id="resetFiltersBtn" class="secondary" onclick="resetRoomFilters()">Reset filters</button>
+                        </div>
+                    </div>
+                    <div id="roomsList"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -755,24 +743,15 @@ button:disabled {
                 <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit chat</button>
             </div>
         </div>
-        <div id="chat" class="chat">
-            <div id="chatEmptyState" class="chat-empty">
-                <div class="chat-empty-title">No room selected yet</div>
-                <div class="chat-empty-text">Pick a room on the left to open the conversation, send text, and share photos, videos, or files.</div>
-            </div>
-        </div>
+        <div id="chat" class="chat"></div>
         <div class="composer">
             <div class="composer-tools">
-                <button class="secondary tool-btn" onclick="pickMedia()">Photo or video</button>
-                <button class="secondary tool-btn" onclick="pickFile()">File</button>
+                <button id="pickMediaBtn" class="secondary tool-btn" onclick="pickMedia()">Photo or video</button>
+                <button id="pickFileBtn" class="secondary tool-btn" onclick="pickFile()">File</button>
             </div>
             <div class="input-row">
-                <input
-                    id="message"
-                    placeholder="Type a message or add a caption..."
-                    onkeydown="handleComposerKey(event)"
-                />
-                <button style="width:120px" onclick="sendMessage()">Send</button>
+                <input id="message" placeholder="Type a message or add a caption..." onkeydown="handleComposerKey(event)" />
+                <button id="sendBtn" style="width:120px" onclick="sendMessage()">Send</button>
             </div>
             <div id="composerStatus" class="status composer-status"></div>
             <input id="mediaInput" class="hidden" type="file" accept="image/*,video/*" onchange="handleAttachmentSelect(event)" />
@@ -782,6 +761,199 @@ button:disabled {
 </div>
 
 <script>
+const translations = {
+    en: {
+        appTitle: "LESogram",
+        brandSubtitle: "Fast rooms, live messages, simple sharing",
+        authTitle: "Account",
+        usernamePlaceholder: "Username",
+        passwordPlaceholder: "Password",
+        login: "Login",
+        register: "Register",
+        logout: "Exit",
+        createRoomTitle: "Create Room",
+        newRoomNamePlaceholder: "New room name",
+        roomPasswordPlaceholder: "Room password",
+        createRoom: "Create room",
+        roomListTitle: "Room List",
+        roomListSubtitle: "Browse and join",
+        hideList: "Hide list",
+        showList: "Show list",
+        roomSearchPlaceholder: "Search by room name...",
+        creatorSearchPlaceholder: "Search by creator...",
+        allRooms: "All rooms",
+        onlineOnly: "Only with online users",
+        emptyOnly: "Only empty rooms",
+        sortNameAsc: "Name A-Z",
+        sortNameDesc: "Name Z-A",
+        sortOnlineDesc: "Online first",
+        sortOnlineAsc: "Online last",
+        sortCreatorAsc: "Creator A-Z",
+        refreshRooms: "Refresh rooms",
+        resetFilters: "Reset filters",
+        chatNotSelected: "Chat not selected",
+        chooseRoom: "Choose a room to start chatting",
+        roomHeader: "Room: {room}",
+        realtimeActive: "Realtime conversation is active",
+        leaveChat: "Exit chat",
+        pickMedia: "Photo or video",
+        pickFile: "File",
+        messagePlaceholder: "Type a message or add a caption...",
+        send: "Send",
+        emptyNoRoomTitle: "No room selected yet",
+        emptyNoRoomText: "Pick a room on the left to open the conversation, send text, and share photos, videos, or files.",
+        emptyNoMessagesTitle: "No messages yet",
+        emptyNoMessagesText: "Start the conversation with a text message or share media.",
+        roomsNone: "No rooms yet",
+        roomsNotFound: "No rooms found",
+        creatorLabel: "creator",
+        onlineLabel: "online",
+        join: "Join",
+        download: "Download",
+        attachmentLabel: "Attachment",
+        fileLabel: "File",
+        roomCount_one: "{count} room",
+        roomCount_many: "{count} rooms",
+        authFill: "Fill username and password",
+        authFailed: "Auth failed",
+        sessionExpired: "Session expired. Please login again.",
+        cannotLoadRooms: "Cannot load rooms",
+        fillRoomData: "Fill room name and password",
+        roomCreated: "Room \"{room}\" created",
+        cannotCreateRoom: "Cannot create room",
+        enterRoomPassword: "Enter room password",
+        cannotJoinRoom: "Cannot join room",
+        joinedRoom: "Joined room \"{room}\"",
+        cannotLoadMessages: "Cannot load messages",
+        realtimeClosed: "Realtime connection closed",
+        joinRoomFirst: "Join a room first",
+        realtimeNotReady: "Realtime connection is not ready",
+        uploadingFile: "Uploading {file}...",
+        fileSent: "{file} sent",
+        uploadFailed: "Upload failed",
+        leftRoom: "You left the room",
+        systemJoined: "{user} joined",
+        systemLeft: "{user} left",
+        apiMissingToken: "Missing token",
+        apiInvalidToken: "Invalid token",
+        apiUserExists: "User already exists",
+        apiInvalidCredentials: "Invalid credentials",
+        apiRoomExists: "Room already exists",
+        apiRoomNotFound: "Room not found",
+        apiWrongRoomPassword: "Wrong room password",
+        apiNoRoomAccess: "No access to this room",
+        apiAttachmentMissingName: "Attachment is missing a file name",
+        apiGifDisabled: "GIF uploads are disabled",
+        apiAttachmentEmpty: "Attachment is empty",
+        apiAttachmentTooLarge: "Attachment is too large. Max size is {size} MB",
+        apiMessageTooLong: "Message must be at most {max} characters",
+        apiMessageEmpty: "Message cannot be empty"
+    },
+    ru: {
+        appTitle: "LESogram",
+        brandSubtitle: "Быстрые комнаты, живые сообщения и удобная отправка файлов",
+        authTitle: "Аккаунт",
+        usernamePlaceholder: "Имя пользователя",
+        passwordPlaceholder: "Пароль",
+        login: "Войти",
+        register: "Регистрация",
+        logout: "Выйти",
+        createRoomTitle: "Создать комнату",
+        newRoomNamePlaceholder: "Название новой комнаты",
+        roomPasswordPlaceholder: "Пароль комнаты",
+        createRoom: "Создать комнату",
+        roomListTitle: "Список комнат",
+        roomListSubtitle: "Выберите и подключитесь",
+        hideList: "Скрыть список",
+        showList: "Показать список",
+        roomSearchPlaceholder: "Поиск по названию комнаты...",
+        creatorSearchPlaceholder: "Поиск по создателю...",
+        allRooms: "Все комнаты",
+        onlineOnly: "Только с пользователями онлайн",
+        emptyOnly: "Только пустые комнаты",
+        sortNameAsc: "Название А-Я",
+        sortNameDesc: "Название Я-А",
+        sortOnlineDesc: "Сначала онлайн",
+        sortOnlineAsc: "Сначала пустые",
+        sortCreatorAsc: "Создатель А-Я",
+        refreshRooms: "Обновить комнаты",
+        resetFilters: "Сбросить фильтры",
+        chatNotSelected: "Чат не выбран",
+        chooseRoom: "Выберите комнату, чтобы начать общение",
+        roomHeader: "Комната: {room}",
+        realtimeActive: "Чат подключён в реальном времени",
+        leaveChat: "Выйти из чата",
+        pickMedia: "Фото или видео",
+        pickFile: "Файл",
+        messagePlaceholder: "Введите сообщение или подпись...",
+        send: "Отправить",
+        emptyNoRoomTitle: "Комната пока не выбрана",
+        emptyNoRoomText: "Выберите комнату слева, чтобы открыть переписку, отправлять текст, фото, видео и файлы.",
+        emptyNoMessagesTitle: "Сообщений пока нет",
+        emptyNoMessagesText: "Начните диалог с текста или отправьте медиа.",
+        roomsNone: "Комнат пока нет",
+        roomsNotFound: "Комнаты не найдены",
+        creatorLabel: "создатель",
+        onlineLabel: "онлайн",
+        join: "Войти",
+        download: "Скачать",
+        attachmentLabel: "Вложение",
+        fileLabel: "Файл",
+        roomCount_one: "{count} комната",
+        roomCount_few: "{count} комнаты",
+        roomCount_many: "{count} комнат",
+        authFill: "Введите имя пользователя и пароль",
+        authFailed: "Ошибка входа",
+        sessionExpired: "Сессия истекла. Войдите снова.",
+        cannotLoadRooms: "Не удалось загрузить комнаты",
+        fillRoomData: "Введите название комнаты и пароль",
+        roomCreated: "Комната \"{room}\" создана",
+        cannotCreateRoom: "Не удалось создать комнату",
+        enterRoomPassword: "Введите пароль комнаты",
+        cannotJoinRoom: "Не удалось войти в комнату",
+        joinedRoom: "Вы вошли в комнату \"{room}\"",
+        cannotLoadMessages: "Не удалось загрузить сообщения",
+        realtimeClosed: "Соединение в реальном времени закрыто",
+        joinRoomFirst: "Сначала войдите в комнату",
+        realtimeNotReady: "Соединение ещё не готово",
+        uploadingFile: "Загрузка {file}...",
+        fileSent: "{file} отправлен",
+        uploadFailed: "Не удалось загрузить файл",
+        leftRoom: "Вы вышли из комнаты",
+        systemJoined: "{user} вошёл(а)",
+        systemLeft: "{user} вышел(а)",
+        apiMissingToken: "Токен отсутствует",
+        apiInvalidToken: "Недействительный токен",
+        apiUserExists: "Пользователь уже существует",
+        apiInvalidCredentials: "Неверные данные для входа",
+        apiRoomExists: "Комната уже существует",
+        apiRoomNotFound: "Комната не найдена",
+        apiWrongRoomPassword: "Неверный пароль комнаты",
+        apiNoRoomAccess: "Нет доступа к этой комнате",
+        apiAttachmentMissingName: "У файла отсутствует имя",
+        apiGifDisabled: "Загрузка GIF отключена",
+        apiAttachmentEmpty: "Файл пустой",
+        apiAttachmentTooLarge: "Файл слишком большой. Максимум {size} МБ",
+        apiMessageTooLong: "Сообщение должно быть не длиннее {max} символов",
+        apiMessageEmpty: "Сообщение не может быть пустым"
+    }
+};
+
+const API_DETAIL_MAP = {
+    "Missing token": "apiMissingToken",
+    "Invalid token": "apiInvalidToken",
+    "User already exists": "apiUserExists",
+    "Invalid credentials": "apiInvalidCredentials",
+    "Room already exists": "apiRoomExists",
+    "Room not found": "apiRoomNotFound",
+    "Wrong room password": "apiWrongRoomPassword",
+    "No access to this room": "apiNoRoomAccess",
+    "Attachment is missing a file name": "apiAttachmentMissingName",
+    "GIF uploads are disabled": "apiGifDisabled",
+    "Attachment is empty": "apiAttachmentEmpty",
+    "Message cannot be empty": "apiMessageEmpty"
+};
+
 let token = localStorage.getItem("token") || "";
 let currentUser = localStorage.getItem("username") || "";
 let currentRoom = "";
@@ -789,12 +961,115 @@ let currentRoomToken = "";
 let ws = null;
 let roomsListCollapsed = false;
 let allRooms = [];
+let currentLanguage = getInitialLanguage();
+
+function getInitialLanguage() {
+    const saved = localStorage.getItem("language");
+    if (saved === "en" || saved === "ru") {
+        return saved;
+    }
+    return navigator.language && navigator.language.toLowerCase().startsWith("ru") ? "ru" : "en";
+}
+
+function t(key, vars = {}) {
+    const source = translations[currentLanguage][key] ?? translations.en[key] ?? key;
+    return source.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+}
+
+function pluralizeRu(count, one, few, many) {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+    return many;
+}
+
+function formatRoomCount(count) {
+    if (currentLanguage === "ru") {
+        const form = pluralizeRu(count, t("roomCount_one", { count }), t("roomCount_few", { count }), t("roomCount_many", { count }));
+        return form;
+    }
+    return count === 1 ? t("roomCount_one", { count }) : t("roomCount_many", { count });
+}
+
+function translateApiDetail(detail) {
+    if (!detail) return "";
+    if (typeof detail !== "string") return "";
+
+    if (API_DETAIL_MAP[detail]) {
+        return t(API_DETAIL_MAP[detail]);
+    }
+
+    let match = detail.match(/^Attachment is too large\. Max size is (\d+) MB$/);
+    if (match) {
+        return t("apiAttachmentTooLarge", { size: match[1] });
+    }
+
+    match = detail.match(/^Message must be at most (\d+) characters$/);
+    if (match) {
+        return t("apiMessageTooLong", { max: match[1] });
+    }
+
+    return detail;
+}
+
+function getApiErrorMessage(data, fallbackKey) {
+    const translated = translateApiDetail(data?.detail);
+    return translated || t(fallbackKey);
+}
+
+function setLanguage(language) {
+    if (!translations[language]) return;
+    currentLanguage = language;
+    localStorage.setItem("language", language);
+    applyTranslations();
+}
+
+function setButtonText(id, key, vars = {}) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = t(key, vars);
+    }
+}
+
+function setInputPlaceholder(id, key) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.placeholder = t(key);
+    }
+}
+
+function updateLanguageButtons() {
+    document.getElementById("langEnBtn").classList.toggle("active", currentLanguage === "en");
+    document.getElementById("langRuBtn").classList.toggle("active", currentLanguage === "ru");
+}
 
 function updateRoomsCount() {
     const pill = document.getElementById("roomsCountPill");
     if (!pill) return;
-    const count = allRooms.length;
-    pill.textContent = `${count} room${count === 1 ? "" : "s"}`;
+    pill.textContent = formatRoomCount(allRooms.length);
+}
+
+function updateChatHeader() {
+    document.getElementById("chatHeader").innerText = currentRoom ? t("roomHeader", { room: currentRoom }) : t("chatNotSelected");
+    document.getElementById("chatSubheader").innerText = currentRoom ? t("realtimeActive") : t("chooseRoom");
+}
+
+function renderChatEmptyState() {
+    const chat = document.getElementById("chat");
+    let empty = document.getElementById("chatEmptyState");
+
+    if (!empty) {
+        empty = document.createElement("div");
+        empty.id = "chatEmptyState";
+        empty.className = "chat-empty";
+        chat.appendChild(empty);
+    }
+
+    empty.innerHTML = `
+        <div class="chat-empty-title">${currentRoom ? t("emptyNoMessagesTitle") : t("emptyNoRoomTitle")}</div>
+        <div class="chat-empty-text">${currentRoom ? t("emptyNoMessagesText") : t("emptyNoRoomText")}</div>
+    `;
 }
 
 function toggleChatEmptyState() {
@@ -804,6 +1079,67 @@ function toggleChatEmptyState() {
 
     const hasRealMessages = Array.from(chat.children).some(node => node.id !== "chatEmptyState");
     empty.classList.toggle("hidden", hasRealMessages);
+}
+
+function refreshRuntimeTranslations() {
+    document.querySelectorAll(".system[data-system-event][data-system-actor]").forEach((node) => {
+        const event = node.dataset.systemEvent;
+        const actor = node.dataset.systemActor;
+        const key = event === "joined" ? "systemJoined" : "systemLeft";
+        node.textContent = t(key, { user: actor });
+    });
+
+    document.querySelectorAll(".file-link[data-i18n-key='download']").forEach((node) => {
+        node.textContent = t("download");
+    });
+}
+
+function applyTranslations() {
+    document.documentElement.lang = currentLanguage;
+    document.title = t("appTitle");
+
+    document.getElementById("brandSubtitle").textContent = t("brandSubtitle");
+    document.getElementById("authTitle").textContent = t("authTitle");
+    document.getElementById("createRoomTitle").textContent = t("createRoomTitle");
+    document.getElementById("roomListTitle").textContent = t("roomListTitle");
+    document.getElementById("roomListSubtitle").textContent = t("roomListSubtitle");
+
+    setButtonText("loginBtn", "login");
+    setButtonText("registerBtn", "register");
+    setButtonText("logoutBtn", "logout");
+    setButtonText("createRoomBtn", "createRoom");
+    setButtonText("refreshRoomsBtn", "refreshRooms");
+    setButtonText("resetFiltersBtn", "resetFilters");
+    setButtonText("leaveChatBtn", "leaveChat");
+    setButtonText("pickMediaBtn", "pickMedia");
+    setButtonText("pickFileBtn", "pickFile");
+    setButtonText("sendBtn", "send");
+
+    setInputPlaceholder("username", "usernamePlaceholder");
+    setInputPlaceholder("password", "passwordPlaceholder");
+    setInputPlaceholder("newRoomName", "newRoomNamePlaceholder");
+    setInputPlaceholder("newRoomPassword", "roomPasswordPlaceholder");
+    setInputPlaceholder("roomSearch", "roomSearchPlaceholder");
+    setInputPlaceholder("creatorSearch", "creatorSearchPlaceholder");
+    setInputPlaceholder("message", "messagePlaceholder");
+
+    document.getElementById("onlineFilterAll").textContent = t("allRooms");
+    document.getElementById("onlineFilterOnline").textContent = t("onlineOnly");
+    document.getElementById("onlineFilterEmpty").textContent = t("emptyOnly");
+    document.getElementById("sortNameAsc").textContent = t("sortNameAsc");
+    document.getElementById("sortNameDesc").textContent = t("sortNameDesc");
+    document.getElementById("sortOnlineDesc").textContent = t("sortOnlineDesc");
+    document.getElementById("sortOnlineAsc").textContent = t("sortOnlineAsc");
+    document.getElementById("sortCreatorAsc").textContent = t("sortCreatorAsc");
+
+    updateLanguageButtons();
+    updateChatHeader();
+    updateRoomsCount();
+    renderChatEmptyState();
+    toggleChatEmptyState();
+    refreshRuntimeTranslations();
+    setRoomsListCollapsed(roomsListCollapsed);
+    renderRooms();
 }
 
 function setStatus(id, text, isError = false) {
@@ -832,7 +1168,8 @@ function authHeaders(options = {}) {
 function formatTime(iso) {
     if (!iso) return "";
     const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const locale = currentLanguage === "ru" ? "ru-RU" : "en-US";
+    return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatBytes(bytes) {
@@ -869,7 +1206,7 @@ function buildAttachmentNode(payload) {
 
         const img = document.createElement("img");
         img.src = payload.media_url;
-        img.alt = payload.file_name || contentType;
+        img.alt = payload.file_name || t("attachmentLabel");
         img.loading = "lazy";
 
         media.appendChild(img);
@@ -897,19 +1234,20 @@ function buildAttachmentNode(payload) {
 
     const name = document.createElement("div");
     name.className = "msg-file-name";
-    name.textContent = payload.file_name || "Attachment";
+    name.textContent = payload.file_name || t("attachmentLabel");
 
     const meta = document.createElement("div");
     meta.className = "msg-file-meta";
     const metaParts = [];
     if (payload.mime_type) metaParts.push(payload.mime_type);
     if (payload.file_size) metaParts.push(formatBytes(payload.file_size));
-    meta.textContent = metaParts.join(" • ") || "File";
+    meta.textContent = metaParts.join(" • ") || t("fileLabel");
 
     const link = document.createElement("a");
     link.className = "file-link";
+    link.dataset.i18nKey = "download";
     link.href = payload.media_url;
-    link.textContent = "Download";
+    link.textContent = t("download");
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     if (payload.file_name) {
@@ -923,13 +1261,30 @@ function buildAttachmentNode(payload) {
     return fileBox;
 }
 
+function getSystemMessageText(payload) {
+    const actor = payload.system_actor || payload.username || "";
+    if (payload.system_event === "joined") {
+        return t("systemJoined", { user: actor });
+    }
+    if (payload.system_event === "left") {
+        return t("systemLeft", { user: actor });
+    }
+    return payload.text || "";
+}
+
 function addMessage(payload) {
     const chat = document.getElementById("chat");
     const div = document.createElement("div");
 
     if (payload.type === "system") {
         div.className = "msg system";
-        div.innerText = payload.text;
+        if (payload.system_event) {
+            div.dataset.systemEvent = payload.system_event;
+        }
+        if (payload.system_actor) {
+            div.dataset.systemActor = payload.system_actor;
+        }
+        div.innerText = getSystemMessageText(payload);
         chat.appendChild(div);
         toggleChatEmptyState();
         chat.scrollTop = chat.scrollHeight;
@@ -970,13 +1325,8 @@ function addMessage(payload) {
 }
 
 function clearChat() {
-    const chat = document.getElementById("chat");
-    chat.innerHTML = `
-        <div id="chatEmptyState" class="chat-empty">
-            <div class="chat-empty-title">${currentRoom ? "No messages yet" : "No room selected yet"}</div>
-            <div class="chat-empty-text">${currentRoom ? "Start the conversation with a text message or share media." : "Pick a room on the left to open the conversation, send text, and share photos, videos, or files."}</div>
-        </div>
-    `;
+    document.getElementById("chat").innerHTML = "";
+    renderChatEmptyState();
     toggleChatEmptyState();
 }
 
@@ -987,7 +1337,7 @@ function setRoomsListCollapsed(collapsed) {
     const toggleButton = document.getElementById("toggleRoomsBtn");
 
     roomsListSection.classList.toggle("hidden", collapsed);
-    toggleButton.textContent = collapsed ? "Show list" : "Hide list";
+    toggleButton.textContent = collapsed ? t("showList") : t("hideList");
 }
 
 function toggleRoomsList() {
@@ -1010,7 +1360,7 @@ async function auth(mode) {
     const password = document.getElementById("password").value.trim();
 
     if (!username || !password) {
-        setStatus("authStatus", "Fill username and password", true);
+        setStatus("authStatus", t("authFill"), true);
         return;
     }
 
@@ -1023,7 +1373,7 @@ async function auth(mode) {
     const data = await res.json();
 
     if (!res.ok) {
-        setStatus("authStatus", data.detail || "Auth failed", true);
+        setStatus("authStatus", getApiErrorMessage(data, "authFailed"), true);
         return;
     }
 
@@ -1048,10 +1398,10 @@ async function loadRooms() {
     if (!res.ok) {
         if (res.status === 401) {
             logout();
-            setStatus("authStatus", "Session expired. Please login again.", true);
+            setStatus("authStatus", t("sessionExpired"), true);
             return false;
         }
-        setStatus("roomStatus", data.detail || "Cannot load rooms", true);
+        setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadRooms"), true);
         return false;
     }
 
@@ -1074,9 +1424,7 @@ function getFilteredRooms() {
     }
 
     if (creatorSearch) {
-        rooms = rooms.filter(room =>
-            String(room.created_by).toLowerCase().includes(creatorSearch)
-        );
+        rooms = rooms.filter(room => String(room.created_by).toLowerCase().includes(creatorSearch));
     }
 
     if (onlineFilter === "online") {
@@ -1108,7 +1456,7 @@ function renderRooms() {
     if (!allRooms.length) {
         const empty = document.createElement("div");
         empty.className = "status";
-        empty.textContent = "No rooms yet";
+        empty.textContent = t("roomsNone");
         list.appendChild(empty);
         return;
     }
@@ -1116,7 +1464,7 @@ function renderRooms() {
     if (!rooms.length) {
         const empty = document.createElement("div");
         empty.className = "status";
-        empty.textContent = "No rooms found";
+        empty.textContent = t("roomsNotFound");
         list.appendChild(empty);
         return;
     }
@@ -1133,17 +1481,17 @@ function renderRooms() {
         meta.className = "room-meta";
 
         const creatorLine = document.createElement("div");
-        creatorLine.textContent = `creator: ${room.created_by}`;
+        creatorLine.textContent = `${t("creatorLabel")}: ${room.created_by}`;
 
         const onlineLine = document.createElement("div");
-        onlineLine.textContent = `online: ${room.online}`;
+        onlineLine.textContent = `${t("onlineLabel")}: ${room.online}`;
 
         const input = document.createElement("input");
         input.type = "password";
-        input.placeholder = "Room password";
+        input.placeholder = t("roomPasswordPlaceholder");
 
         const button = document.createElement("button");
-        button.textContent = "Join";
+        button.textContent = t("join");
         button.addEventListener("click", () => joinRoom(room.name, input));
 
         meta.appendChild(creatorLine);
@@ -1163,7 +1511,6 @@ function resetRoomFilters() {
     document.getElementById("creatorSearch").value = "";
     document.getElementById("onlineFilter").value = "all";
     document.getElementById("sortRooms").value = "name_asc";
-
     renderRooms();
 }
 
@@ -1172,7 +1519,7 @@ async function createRoom() {
     const password = document.getElementById("newRoomPassword").value.trim();
 
     if (!name || !password) {
-        setStatus("roomStatus", "Fill room name and password", true);
+        setStatus("roomStatus", t("fillRoomData"), true);
         return;
     }
 
@@ -1185,11 +1532,11 @@ async function createRoom() {
     const data = await res.json();
 
     if (!res.ok) {
-        setStatus("roomStatus", data.detail || "Cannot create room", true);
+        setStatus("roomStatus", getApiErrorMessage(data, "cannotCreateRoom"), true);
         return;
     }
 
-    setStatus("roomStatus", `Room "${name}" created`);
+    setStatus("roomStatus", t("roomCreated", { room: name }));
     document.getElementById("newRoomName").value = "";
     document.getElementById("newRoomPassword").value = "";
     await loadRooms();
@@ -1199,7 +1546,7 @@ async function joinRoom(roomName, pwdInput) {
     const password = pwdInput.value.trim();
 
     if (!password) {
-        setStatus("roomStatus", "Enter room password", true);
+        setStatus("roomStatus", t("enterRoomPassword"), true);
         return;
     }
 
@@ -1212,21 +1559,20 @@ async function joinRoom(roomName, pwdInput) {
     const data = await res.json();
 
     if (!res.ok) {
-        setStatus("roomStatus", data.detail || "Cannot join room", true);
+        setStatus("roomStatus", getApiErrorMessage(data, "cannotJoinRoom"), true);
         return;
     }
 
     currentRoom = roomName;
     currentRoomToken = data.room_token;
-    document.getElementById("chatHeader").innerText = `Room: ${roomName}`;
-    document.getElementById("chatSubheader").innerText = "Realtime conversation is active";
+    updateChatHeader();
     document.getElementById("leaveChatBtn").classList.remove("hidden");
 
     clearChat();
     await loadMessages();
     connectWS();
     setRoomsListCollapsed(true);
-    setStatus("roomStatus", `Joined room "${roomName}"`);
+    setStatus("roomStatus", t("joinedRoom", { room: roomName }));
     setComposerStatus("");
 }
 
@@ -1237,7 +1583,7 @@ async function loadMessages() {
     const data = await res.json();
 
     if (!res.ok) {
-        setStatus("roomStatus", data.detail || "Cannot load messages", true);
+        setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadMessages"), true);
         return;
     }
 
@@ -1263,7 +1609,7 @@ function connectWS() {
 
     ws.onclose = () => {
         if (currentRoom) {
-            setComposerStatus("Realtime connection closed", true);
+            setComposerStatus(t("realtimeClosed"), true);
         }
     };
 
@@ -1274,7 +1620,7 @@ function connectWS() {
 
 function ensureRoomSelected() {
     if (!currentRoom || !currentRoomToken) {
-        setComposerStatus("Join a room first", true);
+        setComposerStatus(t("joinRoomFirst"), true);
         return false;
     }
     return true;
@@ -1295,7 +1641,7 @@ function sendMessage() {
 
     if (!text || !ws || ws.readyState !== WebSocket.OPEN) {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
-            setComposerStatus("Realtime connection is not ready", true);
+            setComposerStatus(t("realtimeNotReady"), true);
         }
         return;
     }
@@ -1332,7 +1678,7 @@ async function handleAttachmentSelect(event) {
     formData.append("text", caption);
     formData.append("file", file);
 
-    setComposerStatus(`Uploading ${file.name}...`);
+    setComposerStatus(t("uploadingFile", { file: file.name }));
 
     try {
         const res = await fetch(`/rooms/${encodeURIComponent(currentRoom)}/attachments`, {
@@ -1344,7 +1690,7 @@ async function handleAttachmentSelect(event) {
         const data = await res.json();
 
         if (!res.ok) {
-            setComposerStatus(data.detail || "Upload failed", true);
+            setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
             return;
         }
 
@@ -1353,9 +1699,9 @@ async function handleAttachmentSelect(event) {
         }
 
         document.getElementById("message").value = "";
-        setComposerStatus(`${file.name} sent`);
+        setComposerStatus(t("fileSent", { file: file.name }));
     } catch (error) {
-        setComposerStatus("Upload failed", true);
+        setComposerStatus(t("uploadFailed"), true);
     }
 }
 
@@ -1368,13 +1714,12 @@ function leaveChat() {
     currentRoom = "";
     currentRoomToken = "";
 
-    document.getElementById("chatHeader").innerText = "Chat not selected";
-    document.getElementById("chatSubheader").innerText = "Choose a room to start chatting";
+    updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");
     document.getElementById("message").value = "";
     clearChat();
     setRoomsListCollapsed(false);
-    setStatus("roomStatus", "You left the room");
+    setStatus("roomStatus", t("leftRoom"));
     setComposerStatus("");
 }
 
@@ -1391,8 +1736,7 @@ function logout() {
 
     document.getElementById("username").value = "";
     document.getElementById("password").value = "";
-    document.getElementById("chatHeader").innerText = "Chat not selected";
-    document.getElementById("chatSubheader").innerText = "Choose a room to start chatting";
+    updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");
     document.getElementById("message").value = "";
     clearChat();
@@ -1403,6 +1747,9 @@ function logout() {
 }
 
 async function initializeSession() {
+    applyTranslations();
+    clearChat();
+
     if (!token || !currentUser) return;
 
     showLoggedInState();
