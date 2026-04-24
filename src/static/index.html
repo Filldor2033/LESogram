@@ -215,6 +215,27 @@ button {
     gap: 12px;
 }
 
+.filters {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.filters-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: #020617;
+    color: white;
+}
+
 /* Laptops and smaller desktops */
 @media (max-width: 1200px) {
     body {
@@ -256,6 +277,10 @@ button {
 @media (max-width: 600px) {
     body {
         padding: 8px;
+    }
+
+    .filters-row {
+        grid-template-columns: 1fr;
     }
 
     .container {
@@ -334,8 +359,40 @@ button {
                 <button id="toggleRoomsBtn" class="secondary small-btn" onclick="toggleRoomsList()">Hide list</button>
             </div>
             <div id="roomsListSection">
-                <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
-                <div style="height:10px"></div>
+                <div class="filters">
+                    <input 
+                        id="roomSearch" 
+                        placeholder="Search by room name..." 
+                        oninput="renderRooms()" 
+                    />
+
+                    <input 
+                        id="creatorSearch" 
+                        placeholder="Search by creator..." 
+                        oninput="renderRooms()" 
+                    />
+
+                    <div class="filters-row">
+                        <select id="onlineFilter" onchange="renderRooms()">
+                            <option value="all">All rooms</option>
+                            <option value="online">Only with online users</option>
+                            <option value="empty">Only empty rooms</option>
+                        </select>
+
+                        <select id="sortRooms" onchange="renderRooms()">
+                            <option value="name_asc">Name A-Z</option>
+                            <option value="name_desc">Name Z-A</option>
+                            <option value="online_desc">Online first</option>
+                            <option value="online_asc">Online last</option>
+                            <option value="creator_asc">Creator A-Z</option>
+                        </select>
+                    </div>
+
+                    <div class="filters-row">
+                        <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
+                        <button class="secondary" onclick="resetRoomFilters()">Reset filters</button>
+                    </div>
+                </div>
                 <div id="roomsList"></div>
             </div>
         </div>
@@ -363,6 +420,7 @@ let currentRoom = "";
 let currentRoomToken = "";
 let ws = null;
 let roomsListCollapsed = false;
+let allRooms = [];
 
 function setStatus(id, text, isError=false) {
     const el = document.getElementById(id);
@@ -471,15 +529,78 @@ async function loadRooms() {
     });
 
     const data = await res.json();
-    const list = document.getElementById("roomsList");
-    list.innerHTML = "";
 
     if (!res.ok) {
         setStatus("roomStatus", data.detail || "Cannot load rooms", true);
         return;
     }
 
-    if (!data.length) {
+    allRooms = data;
+    renderRooms();
+}
+
+function getFilteredRooms() {
+    const roomSearch = document.getElementById("roomSearch")?.value.trim().toLowerCase() || "";
+    const creatorSearch = document.getElementById("creatorSearch")?.value.trim().toLowerCase() || "";
+    const onlineFilter = document.getElementById("onlineFilter")?.value || "all";
+    const sortMode = document.getElementById("sortRooms")?.value || "name_asc";
+
+    let rooms = [...allRooms];
+
+    if (roomSearch) {
+        rooms = rooms.filter(room =>
+            room.name.toLowerCase().includes(roomSearch)
+        );
+    }
+
+    if (creatorSearch) {
+        rooms = rooms.filter(room =>
+            String(room.created_by).toLowerCase().includes(creatorSearch)
+        );
+    }
+
+    if (onlineFilter === "online") {
+        rooms = rooms.filter(room => Number(room.online) > 0);
+    }
+
+    if (onlineFilter === "empty") {
+        rooms = rooms.filter(room => Number(room.online) === 0);
+    }
+
+    rooms.sort((a, b) => {
+        if (sortMode === "name_asc") {
+            return a.name.localeCompare(b.name);
+        }
+
+        if (sortMode === "name_desc") {
+            return b.name.localeCompare(a.name);
+        }
+
+        if (sortMode === "online_desc") {
+            return Number(b.online) - Number(a.online);
+        }
+
+        if (sortMode === "online_asc") {
+            return Number(a.online) - Number(b.online);
+        }
+
+        if (sortMode === "creator_asc") {
+            return String(a.created_by).localeCompare(String(b.created_by));
+        }
+
+        return 0;
+    });
+
+    return rooms;
+}
+
+function renderRooms() {
+    const list = document.getElementById("roomsList");
+    list.innerHTML = "";
+
+    const rooms = getFilteredRooms();
+
+    if (!allRooms.length) {
         const empty = document.createElement("div");
         empty.className = "status";
         empty.textContent = "No rooms yet";
@@ -487,7 +608,15 @@ async function loadRooms() {
         return;
     }
 
-    for (const room of data) {
+    if (!rooms.length) {
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No rooms found";
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const room of rooms) {
         const item = document.createElement("div");
         item.className = "room-item";
 
@@ -497,7 +626,6 @@ async function loadRooms() {
 
         const meta = document.createElement("div");
         meta.className = "room-meta";
-        meta.innerHTML = ""; // можно вообще не использовать, ниже безопаснее через textContent
 
         const creatorLine = document.createElement("div");
         creatorLine.textContent = `creator: ${room.created_by}`;
@@ -523,6 +651,15 @@ async function loadRooms() {
 
         list.appendChild(item);
     }
+}
+
+function resetRoomFilters() {
+    document.getElementById("roomSearch").value = "";
+    document.getElementById("creatorSearch").value = "";
+    document.getElementById("onlineFilter").value = "all";
+    document.getElementById("sortRooms").value = "name_asc";
+
+    renderRooms();
 }
 
 async function createRoom() {
