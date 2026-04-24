@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Realtime Chat</title>
+<title>LESogram</title>
 <style>
 :root {
     --bg: #0f172a;
@@ -29,11 +29,10 @@ body {
 }
 
 .container {
-    width: 780px;
-    max-width: 100%;
+    width: min(1100px, 100%);
     height: calc(100vh - 48px);
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 340px minmax(0, 1fr);
     gap: 16px;
 }
 
@@ -196,13 +195,139 @@ button {
     width: auto;
     padding: 8px 12px;
 }
+
+.rooms-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.rooms-list-title {
+    font-weight: bold;
+}
+
+.chat-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.filters {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.filters-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: #020617;
+    color: white;
+}
+
+/* Laptops and smaller desktops */
+@media (max-width: 1200px) {
+    body {
+        padding: 16px;
+    }
+
+    .container {
+        height: calc(100vh - 32px);
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 12px;
+    }
+}
+
+/* Tablets */
+@media (max-width: 900px) {
+    body {
+        padding: 12px;
+        overflow-y: auto;
+    }
+
+    .container {
+        height: calc(100vh - 24px);
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(280px, 42vh) minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .panel,
+    .chat-panel {
+        border-radius: 14px;
+    }
+
+    .msg {
+        max-width: 92%;
+    }
+}
+
+/* Smartphones */
+@media (max-width: 600px) {
+    body {
+        padding: 8px;
+    }
+
+    .filters-row {
+        grid-template-columns: 1fr;
+    }
+
+    .container {
+        min-height: calc(100vh - 16px);
+        height: auto;
+        grid-template-rows: auto minmax(360px, 1fr);
+        gap: 8px;
+    }
+
+    .header {
+        padding: 12px;
+    }
+
+    .section {
+        padding: 12px;
+    }
+
+    .topbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .input-row {
+        flex-wrap: wrap;
+        padding: 10px;
+    }
+
+    .input-row button {
+        width: 100% !important;
+    }
+
+    .msg {
+        max-width: 100%;
+    }
+
+    .chat-topbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+}
 </style>
 </head>
 <body>
 
 <div class="container">
     <div class="panel">
-        <div class="header">Аккаунт и комнаты</div>
+        <div class="header">LESogram</div>
 
         <div class="section" id="authSection">
             <input id="username" placeholder="Username" />
@@ -229,14 +354,57 @@ button {
 
             <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
 
-            <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
-            <div style="height:10px"></div>
-            <div id="roomsList"></div>
+            <div class="rooms-list-header">
+                <div class="rooms-list-title">Room list</div>
+                <button id="toggleRoomsBtn" class="secondary small-btn" onclick="toggleRoomsList()">Hide list</button>
+            </div>
+            <div id="roomsListSection">
+                <div class="filters">
+                    <input 
+                        id="roomSearch" 
+                        placeholder="Search by room name..." 
+                        oninput="renderRooms()" 
+                    />
+
+                    <input 
+                        id="creatorSearch" 
+                        placeholder="Search by creator..." 
+                        oninput="renderRooms()" 
+                    />
+
+                    <div class="filters-row">
+                        <select id="onlineFilter" onchange="renderRooms()">
+                            <option value="all">All rooms</option>
+                            <option value="online">Only with online users</option>
+                            <option value="empty">Only empty rooms</option>
+                        </select>
+
+                        <select id="sortRooms" onchange="renderRooms()">
+                            <option value="name_asc">Name A-Z</option>
+                            <option value="name_desc">Name Z-A</option>
+                            <option value="online_desc">Online first</option>
+                            <option value="online_asc">Online last</option>
+                            <option value="creator_asc">Creator A-Z</option>
+                        </select>
+                    </div>
+
+                    <div class="filters-row">
+                        <button class="secondary" onclick="loadRooms()">Refresh rooms</button>
+                        <button class="secondary" onclick="resetRoomFilters()">Reset filters</button>
+                    </div>
+                </div>
+                <div id="roomsList"></div>
+            </div>
         </div>
     </div>
 
     <div class="chat-panel">
-        <div class="header" id="chatHeader">Чат не выбран</div>
+        <div class="header">
+            <div class="chat-topbar">
+                <span id="chatHeader">Чат не выбран</span>
+                <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit chat</button>
+            </div>
+        </div>
         <div id="chat" class="chat"></div>
         <div class="input-row">
             <input id="message" placeholder="Type message..." onkeydown="if(event.key==='Enter') sendMessage()" />
@@ -251,6 +419,8 @@ let currentUser = localStorage.getItem("username") || "";
 let currentRoom = "";
 let currentRoomToken = "";
 let ws = null;
+let roomsListCollapsed = false;
+let allRooms = [];
 
 function setStatus(id, text, isError=false) {
     const el = document.getElementById(id);
@@ -301,6 +471,20 @@ function clearChat() {
     document.getElementById("chat").innerHTML = "";
 }
 
+function setRoomsListCollapsed(collapsed) {
+    roomsListCollapsed = collapsed;
+
+    const roomsListSection = document.getElementById("roomsListSection");
+    const toggleButton = document.getElementById("toggleRoomsBtn");
+
+    roomsListSection.classList.toggle("hidden", collapsed);
+    toggleButton.textContent = collapsed ? "Show list" : "Hide list";
+}
+
+function toggleRoomsList() {
+    setRoomsListCollapsed(!roomsListCollapsed);
+}
+
 async function auth(mode) {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
@@ -345,33 +529,137 @@ async function loadRooms() {
     });
 
     const data = await res.json();
-    const list = document.getElementById("roomsList");
-    list.innerHTML = "";
 
     if (!res.ok) {
         setStatus("roomStatus", data.detail || "Cannot load rooms", true);
         return;
     }
 
-    if (!data.length) {
-        list.innerHTML = `<div class="status">No rooms yet</div>`;
+    allRooms = data;
+    renderRooms();
+}
+
+function getFilteredRooms() {
+    const roomSearch = document.getElementById("roomSearch")?.value.trim().toLowerCase() || "";
+    const creatorSearch = document.getElementById("creatorSearch")?.value.trim().toLowerCase() || "";
+    const onlineFilter = document.getElementById("onlineFilter")?.value || "all";
+    const sortMode = document.getElementById("sortRooms")?.value || "name_asc";
+
+    let rooms = [...allRooms];
+
+    if (roomSearch) {
+        rooms = rooms.filter(room =>
+            room.name.toLowerCase().includes(roomSearch)
+        );
+    }
+
+    if (creatorSearch) {
+        rooms = rooms.filter(room =>
+            String(room.created_by).toLowerCase().includes(creatorSearch)
+        );
+    }
+
+    if (onlineFilter === "online") {
+        rooms = rooms.filter(room => Number(room.online) > 0);
+    }
+
+    if (onlineFilter === "empty") {
+        rooms = rooms.filter(room => Number(room.online) === 0);
+    }
+
+    rooms.sort((a, b) => {
+        if (sortMode === "name_asc") {
+            return a.name.localeCompare(b.name);
+        }
+
+        if (sortMode === "name_desc") {
+            return b.name.localeCompare(a.name);
+        }
+
+        if (sortMode === "online_desc") {
+            return Number(b.online) - Number(a.online);
+        }
+
+        if (sortMode === "online_asc") {
+            return Number(a.online) - Number(b.online);
+        }
+
+        if (sortMode === "creator_asc") {
+            return String(a.created_by).localeCompare(String(b.created_by));
+        }
+
+        return 0;
+    });
+
+    return rooms;
+}
+
+function renderRooms() {
+    const list = document.getElementById("roomsList");
+    list.innerHTML = "";
+
+    const rooms = getFilteredRooms();
+
+    if (!allRooms.length) {
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No rooms yet";
+        list.appendChild(empty);
         return;
     }
 
-    for (const room of data) {
+    if (!rooms.length) {
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No rooms found";
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const room of rooms) {
         const item = document.createElement("div");
         item.className = "room-item";
-        item.innerHTML = `
-            <div class="room-title">${room.name}</div>
-            <div class="room-meta">
-                creator: ${room.created_by}<br>
-                online: ${room.online}
-            </div>
-            <input type="password" placeholder="Room password" id="pwd_${room.name}">
-            <button onclick="joinRoom('${room.name}')">Join</button>
-        `;
+
+        const title = document.createElement("div");
+        title.className = "room-title";
+        title.textContent = room.name;
+
+        const meta = document.createElement("div");
+        meta.className = "room-meta";
+
+        const creatorLine = document.createElement("div");
+        creatorLine.textContent = `creator: ${room.created_by}`;
+
+        const onlineLine = document.createElement("div");
+        onlineLine.textContent = `online: ${room.online}`;
+
+        const input = document.createElement("input");
+        input.type = "password";
+        input.placeholder = "Room password";
+
+        const button = document.createElement("button");
+        button.textContent = "Join";
+        button.addEventListener("click", () => joinRoom(room.name, input));
+
+        meta.appendChild(creatorLine);
+        meta.appendChild(onlineLine);
+
+        item.appendChild(title);
+        item.appendChild(meta);
+        item.appendChild(input);
+        item.appendChild(button);
+
         list.appendChild(item);
     }
+}
+
+function resetRoomFilters() {
+    document.getElementById("roomSearch").value = "";
+    document.getElementById("creatorSearch").value = "";
+    document.getElementById("onlineFilter").value = "all";
+    document.getElementById("sortRooms").value = "name_asc";
+
+    renderRooms();
 }
 
 async function createRoom() {
@@ -402,8 +690,7 @@ async function createRoom() {
     await loadRooms();
 }
 
-async function joinRoom(roomName) {
-    const pwdInput = document.getElementById(`pwd_${roomName}`);
+async function joinRoom(roomName, pwdInput) {
     const password = pwdInput.value.trim();
 
     if (!password) {
@@ -427,10 +714,12 @@ async function joinRoom(roomName) {
     currentRoom = roomName;
     currentRoomToken = data.room_token;
     document.getElementById("chatHeader").innerText = `Комната: ${roomName}`;
+    document.getElementById("leaveChatBtn").classList.remove("hidden");
 
     clearChat();
     await loadMessages();
     connectWS();
+    setRoomsListCollapsed(true);
     setStatus("roomStatus", `Joined room "${roomName}"`);
 }
 
@@ -479,6 +768,22 @@ function sendMessage() {
     input.value = "";
 }
 
+function leaveChat() {
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+
+    currentRoom = "";
+    currentRoomToken = "";
+
+    document.getElementById("chatHeader").innerText = "Чат не выбран";
+    document.getElementById("leaveChatBtn").classList.add("hidden");
+    clearChat();
+    setRoomsListCollapsed(false);
+    setStatus("roomStatus", "You left the room");
+}
+
 function logout() {
     if (ws) ws.close();
     ws = null;
@@ -492,6 +797,7 @@ function logout() {
 
     document.getElementById("authSection").classList.remove("hidden");
     document.getElementById("roomsSection").classList.add("hidden");
+    setRoomsListCollapsed(false);
     document.getElementById("chatHeader").innerText = "Чат не выбран";
     clearChat();
 }

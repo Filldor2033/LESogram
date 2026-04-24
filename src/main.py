@@ -2,7 +2,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -79,6 +79,23 @@ manager = ConnectionManager()
 # room -> set(username)
 room_members: dict[str, set[str]] = defaultdict(set)
 
+# @app.middleware("http")
+# async def add_security_headers(request: Request, call_next):
+#     response = await call_next(request)
+#     response.headers["X-Content-Type-Options"] = "nosniff"
+#     response.headers["X-Frame-Options"] = "DENY"
+#     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+#     response.headers["Content-Security-Policy"] = (
+#         "default-src 'self'; "
+#         "script-src 'self'; "
+#         "style-src 'self' 'unsafe-inline'; "
+#         "img-src 'self' data:; "
+#         "connect-src 'self' ws: wss:; "
+#         "object-src 'none'; "
+#         "base-uri 'self'; "
+#         "frame-ancestors 'none';"
+#     )
+#     return response
 
 @app.post("/register")
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
