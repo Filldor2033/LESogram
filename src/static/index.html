@@ -290,6 +290,25 @@ button:disabled {
     margin: 6px 0 10px;
 }
 
+.room-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.room-actions button {
+    margin-top: 2px;
+}
+
+.danger {
+    background: linear-gradient(180deg, #ef4444, #dc2626);
+    color: #fff7f7;
+    box-shadow: 0 10px 24px rgba(220, 38, 38, 0.18);
+}
+
+.danger:hover {
+    box-shadow: 0 14px 28px rgba(220, 38, 38, 0.24);
+}
+
 .chat {
     flex: 1;
     overflow-y: auto;
@@ -809,6 +828,7 @@ const translations = {
         creatorLabel: "creator",
         onlineLabel: "online",
         join: "Join",
+        delete: "Delete",
         download: "Download",
         attachmentLabel: "Attachment",
         fileLabel: "File",
@@ -821,9 +841,13 @@ const translations = {
         fillRoomData: "Fill room name and password",
         roomCreated: "Room \"{room}\" created",
         cannotCreateRoom: "Cannot create room",
+        cannotDeleteRoom: "Cannot delete room",
         enterRoomPassword: "Enter room password",
         cannotJoinRoom: "Cannot join room",
         joinedRoom: "Joined room \"{room}\"",
+        deletedRoom: "Room \"{room}\" deleted",
+        roomDeletedByOwner: "Room \"{room}\" was deleted by its creator",
+        confirmDeleteRoom: "Delete room \"{room}\"? This will remove its messages and files for everyone.",
         cannotLoadMessages: "Cannot load messages",
         realtimeClosed: "Realtime connection closed",
         joinRoomFirst: "Join a room first",
@@ -834,6 +858,7 @@ const translations = {
         leftRoom: "You left the room",
         systemJoined: "{user} joined",
         systemLeft: "{user} left",
+        systemRoomDeleted: "Room was deleted by {user}",
         apiMissingToken: "Missing token",
         apiInvalidToken: "Invalid token",
         apiUserExists: "User already exists",
@@ -842,6 +867,7 @@ const translations = {
         apiRoomNotFound: "Room not found",
         apiWrongRoomPassword: "Wrong room password",
         apiNoRoomAccess: "No access to this room",
+        apiDeleteDenied: "Only the creator can delete this room",
         apiAttachmentMissingName: "Attachment is missing a file name",
         apiGifDisabled: "GIF uploads are disabled",
         apiAttachmentEmpty: "Attachment is empty",
@@ -896,6 +922,7 @@ const translations = {
         creatorLabel: "создатель",
         onlineLabel: "онлайн",
         join: "Войти",
+        delete: "Удалить",
         download: "Скачать",
         attachmentLabel: "Вложение",
         fileLabel: "Файл",
@@ -909,9 +936,13 @@ const translations = {
         fillRoomData: "Введите название комнаты и пароль",
         roomCreated: "Комната \"{room}\" создана",
         cannotCreateRoom: "Не удалось создать комнату",
+        cannotDeleteRoom: "Не удалось удалить комнату",
         enterRoomPassword: "Введите пароль комнаты",
         cannotJoinRoom: "Не удалось войти в комнату",
         joinedRoom: "Вы вошли в комнату \"{room}\"",
+        deletedRoom: "Комната \"{room}\" удалена",
+        roomDeletedByOwner: "Комната \"{room}\" была удалена создателем",
+        confirmDeleteRoom: "Удалить комнату \"{room}\"? Для всех будут удалены сообщения и файлы.",
         cannotLoadMessages: "Не удалось загрузить сообщения",
         realtimeClosed: "Соединение в реальном времени закрыто",
         joinRoomFirst: "Сначала войдите в комнату",
@@ -922,6 +953,7 @@ const translations = {
         leftRoom: "Вы вышли из комнаты",
         systemJoined: "{user} вошёл(а)",
         systemLeft: "{user} вышел(а)",
+        systemRoomDeleted: "Комната удалена пользователем {user}",
         apiMissingToken: "Токен отсутствует",
         apiInvalidToken: "Недействительный токен",
         apiUserExists: "Пользователь уже существует",
@@ -930,6 +962,7 @@ const translations = {
         apiRoomNotFound: "Комната не найдена",
         apiWrongRoomPassword: "Неверный пароль комнаты",
         apiNoRoomAccess: "Нет доступа к этой комнате",
+        apiDeleteDenied: "Удалять комнату может только её создатель",
         apiAttachmentMissingName: "У файла отсутствует имя",
         apiGifDisabled: "Загрузка GIF отключена",
         apiAttachmentEmpty: "Файл пустой",
@@ -948,6 +981,7 @@ const API_DETAIL_MAP = {
     "Room not found": "apiRoomNotFound",
     "Wrong room password": "apiWrongRoomPassword",
     "No access to this room": "apiNoRoomAccess",
+    "Only the creator can delete this room": "apiDeleteDenied",
     "Attachment is missing a file name": "apiAttachmentMissingName",
     "GIF uploads are disabled": "apiGifDisabled",
     "Attachment is empty": "apiAttachmentEmpty",
@@ -962,6 +996,7 @@ let ws = null;
 let roomsListCollapsed = false;
 let allRooms = [];
 let currentLanguage = getInitialLanguage();
+let suppressNextWsCloseStatus = false;
 
 function getInitialLanguage() {
     const saved = localStorage.getItem("language");
@@ -1269,6 +1304,9 @@ function getSystemMessageText(payload) {
     if (payload.system_event === "left") {
         return t("systemLeft", { user: actor });
     }
+    if (payload.system_event === "room_deleted") {
+        return t("systemRoomDeleted", { user: actor });
+    }
     return payload.text || "";
 }
 
@@ -1494,13 +1532,25 @@ function renderRooms() {
         button.textContent = t("join");
         button.addEventListener("click", () => joinRoom(room.name, input));
 
+        const actions = document.createElement("div");
+        actions.className = "room-actions";
+        actions.appendChild(button);
+
+        if (room.created_by === currentUser) {
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "danger";
+            deleteButton.textContent = t("delete");
+            deleteButton.addEventListener("click", () => deleteRoom(room.name));
+            actions.appendChild(deleteButton);
+        }
+
         meta.appendChild(creatorLine);
         meta.appendChild(onlineLine);
 
         item.appendChild(title);
         item.appendChild(meta);
         item.appendChild(input);
-        item.appendChild(button);
+        item.appendChild(actions);
 
         list.appendChild(item);
     }
@@ -1594,6 +1644,7 @@ async function loadMessages() {
 
 function connectWS() {
     if (ws) {
+        suppressNextWsCloseStatus = true;
         ws.close();
     }
 
@@ -1604,10 +1655,18 @@ function connectWS() {
 
     ws.onmessage = (event) => {
         const payload = JSON.parse(event.data);
+        if (payload.type === "system" && payload.system_event === "room_deleted" && payload.room === currentRoom) {
+            handleRoomDeleted(payload);
+            return;
+        }
         addMessage(payload);
     };
 
     ws.onclose = () => {
+        if (suppressNextWsCloseStatus) {
+            suppressNextWsCloseStatus = false;
+            return;
+        }
         if (currentRoom) {
             setComposerStatus(t("realtimeClosed"), true);
         }
@@ -1665,6 +1724,59 @@ function shouldAppendHttpResponse() {
     return !ws || ws.readyState !== WebSocket.OPEN;
 }
 
+async function deleteRoom(roomName) {
+    if (!confirm(t("confirmDeleteRoom", { room: roomName }))) {
+        return;
+    }
+
+    const res = await fetch(`/rooms/${encodeURIComponent(roomName)}`, {
+        method: "DELETE",
+        headers: authHeaders({ json: false })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        setStatus("roomStatus", getApiErrorMessage(data, "cannotDeleteRoom"), true);
+        return;
+    }
+
+    if (roomName === currentRoom) {
+        resetActiveRoomState();
+    }
+
+    setStatus("roomStatus", t("deletedRoom", { room: roomName }));
+    await loadRooms();
+}
+
+function resetActiveRoomState() {
+    if (ws) {
+        suppressNextWsCloseStatus = true;
+        ws.close();
+        ws = null;
+    }
+
+    currentRoom = "";
+    currentRoomToken = "";
+
+    updateChatHeader();
+    document.getElementById("leaveChatBtn").classList.add("hidden");
+    document.getElementById("message").value = "";
+    clearChat();
+    setRoomsListCollapsed(false);
+    setComposerStatus("");
+}
+
+async function handleRoomDeleted(payload) {
+    const deletedRoom = payload.room || currentRoom;
+    const actor = payload.system_actor || "";
+    const ownDeletion = actor === currentUser;
+
+    resetActiveRoomState();
+    setStatus("roomStatus", ownDeletion ? t("deletedRoom", { room: deletedRoom }) : t("roomDeletedByOwner", { room: deletedRoom }));
+    await loadRooms();
+}
+
 async function handleAttachmentSelect(event) {
     const input = event.target;
     const file = input.files?.[0];
@@ -1706,42 +1818,20 @@ async function handleAttachmentSelect(event) {
 }
 
 function leaveChat() {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
-
-    currentRoom = "";
-    currentRoomToken = "";
-
-    updateChatHeader();
-    document.getElementById("leaveChatBtn").classList.add("hidden");
-    document.getElementById("message").value = "";
-    clearChat();
-    setRoomsListCollapsed(false);
+    resetActiveRoomState();
     setStatus("roomStatus", t("leftRoom"));
-    setComposerStatus("");
 }
 
 function logout() {
-    if (ws) ws.close();
-    ws = null;
+    resetActiveRoomState();
     token = "";
     currentUser = "";
-    currentRoom = "";
-    currentRoomToken = "";
 
     localStorage.removeItem("token");
     localStorage.removeItem("username");
 
     document.getElementById("username").value = "";
     document.getElementById("password").value = "";
-    updateChatHeader();
-    document.getElementById("leaveChatBtn").classList.add("hidden");
-    document.getElementById("message").value = "";
-    clearChat();
-    setRoomsListCollapsed(false);
-    setComposerStatus("");
     setStatus("roomStatus", "");
     showLoggedOutState();
 }

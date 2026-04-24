@@ -143,6 +143,15 @@ class ConnectionManager:
         for connection in dead:
             self.disconnect(connection, room)
 
+    async def close_room(self, room: str, code: int = 1008):
+        connections = list(self.active_connections.get(room, []))
+        for connection in connections:
+            try:
+                await connection.close(code=code)
+            except Exception:
+                pass
+        self.active_connections.pop(room, None)
+
 
 manager = ConnectionManager()
 
@@ -233,6 +242,25 @@ def build_system_payload(room: str, actor: str, event: str) -> dict:
         "system_event": event,
         "system_actor": actor,
     }
+
+
+def remove_room_uploads(messages: list[Message]):
+    for message in messages:
+        media_url = (message.media_url or "").strip()
+        if not media_url.startswith("/uploads/"):
+            continue
+
+        candidate = (UPLOADS_DIR / Path(media_url).name).resolve()
+        try:
+            candidate.relative_to(UPLOADS_DIR.resolve())
+        except ValueError:
+            continue
+
+        if candidate.exists() and candidate.is_file():
+            try:
+                candidate.unlink()
+            except OSError:
+                pass
 
 
 def save_message(
@@ -326,6 +354,32 @@ def create_room(
     db.commit()
 
     return {"status": "created", "room": room_name}
+
+
+@app.delete("/rooms/{room_name}")
+async def delete_room(
+    room_name: str,
+    db: Session = Depends(get_db),
+    username: str = Depends(get_current_user),
+):
+    room = db.query(Room).filter(Room.name == room_name).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if room.created_by != username:
+        raise HTTPException(status_code=403, detail="Only the creator can delete this room")
+
+    messages = db.query(Message).filter(Message.room == room_name).all()
+    remove_room_uploads(messages)
+    db.query(Message).filter(Message.room == room_name).delete(synchronize_session=False)
+    db.delete(room)
+    db.commit()
+
+    await manager.broadcast_json(build_system_payload(room_name, username, "room_deleted"), room_name)
+    room_members.pop(room_name, None)
+    await manager.close_room(room_name)
+
+    return {"status": "deleted", "room": room_name}
 
 
 @app.post("/rooms/join")
