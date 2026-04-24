@@ -16,8 +16,16 @@ class RegisterRequest(BaseModel):
         return v
 
 class LoginRequest(BaseModel):
-    username: str
+    username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=4, max_length=72)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str):
+        v = v.strip()
+        if not SAFE_NAME_RE.fullmatch(v):
+            raise ValueError("Username contains invalid characters")
+        return v
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -40,6 +48,16 @@ class CreateRoomRequest(BaseModel):
 class JoinRoomRequest(BaseModel):
     room: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=1, max_length=72)
+
+    @field_validator("room")
+    @classmethod
+    def validate_room(cls, v: str):
+        v = v.strip()
+        if not v:
+            raise ValueError("Room name cannot be empty")
+        if not SAFE_NAME_RE.fullmatch(v):
+            raise ValueError("Room name contains invalid characters")
+        return v
 
 class SendMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)

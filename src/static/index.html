@@ -859,6 +859,7 @@ const translations = {
         systemJoined: "{user} joined",
         systemLeft: "{user} left",
         systemRoomDeleted: "Room was deleted by {user}",
+        systemRateLimited: "Too many actions. Please slow down.",
         apiMissingToken: "Missing token",
         apiInvalidToken: "Invalid token",
         apiUserExists: "User already exists",
@@ -869,11 +870,14 @@ const translations = {
         apiNoRoomAccess: "No access to this room",
         apiDeleteDenied: "Only the creator can delete this room",
         apiAttachmentMissingName: "Attachment is missing a file name",
+        apiAttachmentNotFound: "Attachment not found",
+        apiFileTypeNotAllowed: "File type is not allowed",
         apiGifDisabled: "GIF uploads are disabled",
         apiAttachmentEmpty: "Attachment is empty",
         apiAttachmentTooLarge: "Attachment is too large. Max size is {size} MB",
         apiMessageTooLong: "Message must be at most {max} characters",
-        apiMessageEmpty: "Message cannot be empty"
+        apiMessageEmpty: "Message cannot be empty",
+        apiTooManyRequests: "Too many requests. Retry in {seconds} seconds"
     },
     ru: {
         appTitle: "LESogram",
@@ -954,6 +958,7 @@ const translations = {
         systemJoined: "{user} вошёл(а)",
         systemLeft: "{user} вышел(а)",
         systemRoomDeleted: "Комната удалена пользователем {user}",
+        systemRateLimited: "Слишком много действий. Немного подождите.",
         apiMissingToken: "Токен отсутствует",
         apiInvalidToken: "Недействительный токен",
         apiUserExists: "Пользователь уже существует",
@@ -964,11 +969,14 @@ const translations = {
         apiNoRoomAccess: "Нет доступа к этой комнате",
         apiDeleteDenied: "Удалять комнату может только её создатель",
         apiAttachmentMissingName: "У файла отсутствует имя",
+        apiAttachmentNotFound: "Вложение не найдено",
+        apiFileTypeNotAllowed: "Такой тип файла запрещён",
         apiGifDisabled: "Загрузка GIF отключена",
         apiAttachmentEmpty: "Файл пустой",
         apiAttachmentTooLarge: "Файл слишком большой. Максимум {size} МБ",
         apiMessageTooLong: "Сообщение должно быть не длиннее {max} символов",
-        apiMessageEmpty: "Сообщение не может быть пустым"
+        apiMessageEmpty: "Сообщение не может быть пустым",
+        apiTooManyRequests: "Слишком много запросов. Повторите через {seconds} сек."
     }
 };
 
@@ -983,6 +991,8 @@ const API_DETAIL_MAP = {
     "No access to this room": "apiNoRoomAccess",
     "Only the creator can delete this room": "apiDeleteDenied",
     "Attachment is missing a file name": "apiAttachmentMissingName",
+    "Attachment not found": "apiAttachmentNotFound",
+    "File type is not allowed": "apiFileTypeNotAllowed",
     "GIF uploads are disabled": "apiGifDisabled",
     "Attachment is empty": "apiAttachmentEmpty",
     "Message cannot be empty": "apiMessageEmpty"
@@ -1043,6 +1053,11 @@ function translateApiDetail(detail) {
     match = detail.match(/^Message must be at most (\d+) characters$/);
     if (match) {
         return t("apiMessageTooLong", { max: match[1] });
+    }
+
+    match = detail.match(/^Too many requests\. Retry in (\d+) seconds$/);
+    if (match) {
+        return t("apiTooManyRequests", { seconds: match[1] });
     }
 
     return detail;
@@ -1224,14 +1239,28 @@ function formatBytes(bytes) {
     return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${unit}`;
 }
 
+function resolveAttachmentUrl(mediaUrl) {
+    if (!mediaUrl) {
+        return "";
+    }
+
+    if (!currentRoomToken) {
+        return mediaUrl;
+    }
+
+    const separator = mediaUrl.includes("?") ? "&" : "?";
+    return `${mediaUrl}${separator}room_token=${encodeURIComponent(currentRoomToken)}`;
+}
+
 function getMessageType(payload) {
     return payload.content_type || "text";
 }
 
 function buildAttachmentNode(payload) {
     const contentType = getMessageType(payload);
+    const resolvedUrl = resolveAttachmentUrl(payload.media_url);
 
-    if (!payload.media_url || contentType === "text") {
+    if (!resolvedUrl || contentType === "text") {
         return null;
     }
 
@@ -1240,7 +1269,7 @@ function buildAttachmentNode(payload) {
         media.className = "msg-media";
 
         const img = document.createElement("img");
-        img.src = payload.media_url;
+        img.src = resolvedUrl;
         img.alt = payload.file_name || t("attachmentLabel");
         img.loading = "lazy";
 
@@ -1253,7 +1282,7 @@ function buildAttachmentNode(payload) {
         media.className = "msg-media";
 
         const video = document.createElement("video");
-        video.src = payload.media_url;
+        video.src = resolvedUrl;
         video.controls = true;
         video.preload = "metadata";
 
@@ -1276,12 +1305,12 @@ function buildAttachmentNode(payload) {
     const metaParts = [];
     if (payload.mime_type) metaParts.push(payload.mime_type);
     if (payload.file_size) metaParts.push(formatBytes(payload.file_size));
-    meta.textContent = metaParts.join(" • ") || t("fileLabel");
+    meta.textContent = metaParts.join(" | ") || t("fileLabel");
 
     const link = document.createElement("a");
     link.className = "file-link";
     link.dataset.i18nKey = "download";
-    link.href = payload.media_url;
+    link.href = resolvedUrl;
     link.textContent = t("download");
     link.target = "_blank";
     link.rel = "noopener noreferrer";
@@ -1306,6 +1335,9 @@ function getSystemMessageText(payload) {
     }
     if (payload.system_event === "room_deleted") {
         return t("systemRoomDeleted", { user: actor });
+    }
+    if (payload.system_event === "rate_limited") {
+        return t("systemRateLimited");
     }
     return payload.text || "";
 }

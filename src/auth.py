@@ -2,8 +2,9 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from pwdlib import PasswordHash
 import os
+import secrets
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
