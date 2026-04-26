@@ -888,6 +888,8 @@ async function joinRoom(roomName, pwdInput) {
     setRoomsListCollapsed(true);
     setStatus("roomStatus", t("joinedRoom", { room: roomName }));
     setComposerStatus("");
+
+    await loadRooms();
 }
 
 async function loadMessages() {
@@ -1109,6 +1111,7 @@ async function handleAttachmentSelect(event) {
 function leaveChat() {
     resetActiveRoomState();
     setStatus("roomStatus", t("leftRoom"));
+    await loadRooms();
 }
 
 function logout() {
