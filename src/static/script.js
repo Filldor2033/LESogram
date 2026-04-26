@@ -685,26 +685,32 @@ async function auth(mode) {
 }
 
 async function loadRooms() {
-    const res = await fetch("/rooms", {
-        headers: authHeaders({ json: false })
-    });
+    try {
+        const res = await fetch("/rooms", {
+            headers: authHeaders({ json: false })
+        });
 
-    const data = safeJson(res);
+        const data = await safeJson(res);
 
-    if (!res.ok) {
-        if (res.status === 401) {
-            logout();
-            setStatus("authStatus", t("sessionExpired"), true);
+        if (!res.ok) {
+            if (res.status === 401) {
+                logout();
+                setStatus("authStatus", t("sessionExpired"), true);
+                return false;
+            }
+
+            setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadRooms"), true);
             return false;
         }
-        setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadRooms"), true);
+
+        allRooms = data;
+        updateRoomsCount();
+        renderRooms();
+        return true;
+    } catch {
+        setStatus("roomStatus", t("cannotLoadRooms"), true);
         return false;
     }
-
-    allRooms = data;
-    updateRoomsCount();
-    renderRooms();
-    return true;
 }
 
 function getFilteredRooms() {
