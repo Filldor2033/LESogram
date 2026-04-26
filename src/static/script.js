@@ -869,8 +869,8 @@ async function joinRoom(roomName, pwdInput) {
     document.getElementById("leaveChatBtn").classList.remove("hidden");
 
     clearChat();
-    await loadMessages();
     connectWS();
+    await loadMessages();
     setRoomsListCollapsed(true);
     setStatus("roomStatus", t("joinedRoom", { room: roomName }));
     setComposerStatus("");
