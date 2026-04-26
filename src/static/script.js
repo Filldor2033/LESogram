@@ -898,31 +898,56 @@ function connectWS() {
         ws.close();
     }
 
+    const roomAtConnect = currentRoom;
+    const tokenAtConnect = currentRoomToken;
+
     const protocol = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(
-        `${protocol}://${location.host}/ws/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`
+    const socket = new WebSocket(
+        `${protocol}://${location.host}/ws/${encodeURIComponent(roomAtConnect)}?room_token=${encodeURIComponent(tokenAtConnect)}`
     );
 
-    ws.onmessage = (event) => {
-        const payload = JSON.parse(event.data);
-        if (payload.type === "system" && payload.system_event === "room_deleted" && payload.room === currentRoom) {
+    ws = socket;
+
+    socket.onmessage = (event) => {
+        if (socket !== ws) return;
+        if (roomAtConnect !== currentRoom) return;
+
+        let payload;
+        try {
+            payload = JSON.parse(event.data);
+        } catch {
+            return;
+        }
+
+        if (payload.room && payload.room !== currentRoom) return;
+
+        if (
+            payload.type === "system" &&
+            payload.system_event === "room_deleted" &&
+            payload.room === currentRoom
+        ) {
             handleRoomDeleted(payload);
             return;
         }
+
         addMessage(payload);
     };
 
-    ws.onclose = () => {
+    socket.onclose = () => {
+        if (socket !== ws) return;
+
         if (suppressNextWsCloseStatus) {
             suppressNextWsCloseStatus = false;
             return;
         }
+
         if (currentRoom) {
             setComposerStatus(t("realtimeClosed"), true);
         }
     };
 
-    ws.onopen = () => {
+    socket.onopen = () => {
+        if (socket !== ws) return;
         setComposerStatus("");
     };
 }
