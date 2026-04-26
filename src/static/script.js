@@ -643,6 +643,14 @@ function showLoggedOutState() {
     document.getElementById("roomsSection").classList.add("hidden");
 }
 
+async function safeJson(res) {
+    try {
+        return await res.json();
+    } catch {
+        return {};
+    }
+}
+
 async function auth(mode) {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
@@ -658,7 +666,7 @@ async function auth(mode) {
         body: JSON.stringify({ username, password })
     });
 
-    const data = await res.json();
+    const data = safeJson(res);
 
     if (!res.ok) {
         setStatus("authStatus", getApiErrorMessage(data, "authFailed"), true);
@@ -681,7 +689,7 @@ async function loadRooms() {
         headers: authHeaders({ json: false })
     });
 
-    const data = await res.json();
+    const data = safeJson(res);
 
     if (!res.ok) {
         if (res.status === 401) {
@@ -829,7 +837,7 @@ async function createRoom() {
         body: JSON.stringify({ name, password })
     });
 
-    const data = await res.json();
+    const data = safeJson(res);
 
     if (!res.ok) {
         setStatus("roomStatus", getApiErrorMessage(data, "cannotCreateRoom"), true);
@@ -856,7 +864,7 @@ async function joinRoom(roomName, pwdInput) {
         body: JSON.stringify({ room: roomName, password })
     });
 
-    const data = await res.json();
+    const data = safeJson(res);
 
     if (!res.ok) {
         setStatus("roomStatus", getApiErrorMessage(data, "cannotJoinRoom"), true);
@@ -880,7 +888,7 @@ async function loadMessages() {
     const res = await fetch(
         `/messages/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`
     );
-    const data = await res.json();
+    const data = safeJson(res);
 
     if (!res.ok) {
         setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadMessages"), true);
@@ -1009,7 +1017,7 @@ async function deleteRoom(roomName) {
         headers: authHeaders({ json: false })
     });
 
-    const data = await res.json();
+    const data = safeJson(res);
 
     if (!res.ok) {
         setStatus("roomStatus", getApiErrorMessage(data, "cannotDeleteRoom"), true);
@@ -1074,7 +1082,7 @@ async function handleAttachmentSelect(event) {
             body: formData
         });
 
-        const data = await res.json();
+        const data = safeJson(res);
 
         if (!res.ok) {
             setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
