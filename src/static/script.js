@@ -1,5 +1,9 @@
 const translations = {
     en: {
+        users: "Users",
+        onlineUsers: "Online users",
+        noOnlineUsers: "No users online",
+        close: "Close",
         appTitle: "LESogram",
         brandSubtitle: "Fast rooms, live messages, simple sharing",
         authTitle: "Account",
@@ -98,6 +102,10 @@ const translations = {
         apiTooManyRequests: "Too many requests. Retry in {seconds} seconds"
     },
     ru: {
+        users: "Участники",
+        onlineUsers: "Пользователи онлайн",
+        noOnlineUsers: "Нет пользователей онлайн",
+        close: "Закрыть",
         appTitle: "LESogram",
         brandSubtitle: "Быстрые комнаты, живые сообщения и удобная отправка файлов",
         authTitle: "Аккаунт",
@@ -112,8 +120,8 @@ const translations = {
         createRoom: "Создать комнату",
         roomListTitle: "Список комнат",
         roomListSubtitle: "Выберите и подключитесь",
-        hideList: "Скрыть список",
-        showList: "Показать список",
+        hideList: "Скрыть",
+        showList: "Показать",
         roomSearchPlaceholder: "Поиск по названию комнаты...",
         creatorSearchPlaceholder: "Поиск по создателю...",
         allRooms: "Все комнаты",
@@ -409,6 +417,12 @@ function applyTranslations() {
     document.getElementById("sortOnlineDesc").textContent = t("sortOnlineDesc");
     document.getElementById("sortOnlineAsc").textContent = t("sortOnlineAsc");
     document.getElementById("sortCreatorAsc").textContent = t("sortCreatorAsc");
+
+    setButtonText("roomUsersBtn", "users");
+    const usersTitle = document.getElementById("usersPopupTitle");
+    if (usersTitle) {
+        usersTitle.textContent = t("onlineUsers");
+    }
 
     updateLanguageButtons();
     updateChatHeader();
@@ -910,6 +924,7 @@ async function joinRoom(roomName, pwdInput) {
     currentRoomToken = data.room_token;
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.remove("hidden");
+    document.getElementById("roomUsersBtn").classList.remove("hidden");
 
     clearChat();
     connectWS();
@@ -976,6 +991,9 @@ function connectWS() {
         }
 
         addMessage(payload);
+        if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
+            loadRoomUsers();
+        }
     };
 
     socket.onclose = () => {
@@ -1069,6 +1087,96 @@ async function deleteRoom(roomName) {
     await loadRooms();
 }
 
+async function loadRoomUsers() {
+    if (!currentRoom || !currentRoomToken) return;
+
+    const list = document.getElementById("usersList");
+    const subtitle = document.getElementById("usersPopupSubtitle");
+
+    if (!list || !subtitle) return;
+
+    list.innerHTML = `<div class="users-loading">...</div>`;
+
+    try {
+        const res = await fetch(
+            `/rooms/${encodeURIComponent(currentRoom)}/users?room_token=${encodeURIComponent(currentRoomToken)}`
+        );
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            list.innerHTML = `<div class="users-empty">${getApiErrorMessage(data, "cannotLoadRooms")}</div>`;
+            subtitle.textContent = formatRoomCount(0);
+            return;
+        }
+
+        subtitle.textContent = formatRoomCount(data.count || 0);
+        renderUsersList(data.users || []);
+    } catch {
+        list.innerHTML = `<div class="users-empty">${t("cannotLoadRooms")}</div>`;
+        subtitle.textContent = formatRoomCount(0);
+    }
+}
+
+function renderUsersList(users) {
+    const list = document.getElementById("usersList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!users.length) {
+        const empty = document.createElement("div");
+        empty.className = "users-empty";
+        empty.textContent = t("noOnlineUsers");
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const username of users) {
+        const item = document.createElement("div");
+        item.className = "user-item";
+
+        const avatar = document.createElement("div");
+        avatar.className = "user-avatar";
+        avatar.textContent = username.slice(0, 1).toUpperCase();
+
+        const name = document.createElement("div");
+        name.className = "user-name";
+        name.textContent = username;
+
+        const badge = document.createElement("div");
+        badge.className = "user-badge";
+        badge.textContent = username === currentUser ? "you" : "online";
+
+        item.appendChild(avatar);
+        item.appendChild(name);
+        item.appendChild(badge);
+
+        list.appendChild(item);
+    }
+}
+
+function toggleUsersPopup() {
+    const popup = document.getElementById("usersPopup");
+    if (!popup) return;
+
+    const willOpen = popup.classList.contains("hidden");
+
+    if (willOpen) {
+        popup.classList.remove("hidden");
+        loadRoomUsers();
+    } else {
+        popup.classList.add("hidden");
+    }
+}
+
+function closeUsersPopup() {
+    const popup = document.getElementById("usersPopup");
+    if (popup) {
+        popup.classList.add("hidden");
+    }
+}
+
 function resetActiveRoomState() {
     if (ws) {
         suppressNextWsCloseStatus = true;
@@ -1081,6 +1189,8 @@ function resetActiveRoomState() {
 
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");
+    document.getElementById("roomUsersBtn").classList.add("hidden");
+    closeUsersPopup();
     document.getElementById("message").value = "";
     clearChat();
     setRoomsListCollapsed(false);

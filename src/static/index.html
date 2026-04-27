@@ -113,8 +113,23 @@
                             <small id="chatSubheader">Choose a room to start chatting</small>
                         </div>
                     </div>
-                    <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit
-                        chat</button>
+                    <div class="chat-actions">
+                        <button id="roomUsersBtn" class="secondary small-btn hidden" onclick="toggleUsersPopup()">Users</button>
+                        <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit chat</button>
+                    </div>
+                </div>
+            </div>
+            <div id="usersPopup" class="users-popup hidden">
+                <div class="users-card">
+                    <div class="users-card-header">
+                        <div>
+                            <div class="users-title" id="usersPopupTitle">Online users</div>
+                            <div class="users-subtitle" id="usersPopupSubtitle">0 users</div>
+                        </div>
+                        <button class="users-close" type="button" onclick="closeUsersPopup()">×</button>
+                    </div>
+
+                    <div id="usersList" class="users-list"></div>
                 </div>
             </div>
             <div id="chat" class="chat"></div>

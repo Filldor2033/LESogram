@@ -1,4 +1,4 @@
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime
 import mimetypes
@@ -307,7 +307,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # room -> set(username)
-room_members: dict[str, set[str]] = defaultdict(set)
+room_members: dict[str, Counter[str]] = defaultdict(Counter)
 
 
 def verify_room_token(token: str | None, room: str) -> str | None:
@@ -522,7 +522,7 @@ def list_rooms(
             "name": room.name,
             "created_by": room.created_by,
             "created_at": room.created_at.isoformat(),
-            "online": len(room_members.get(room.name, set())),
+            "online": len(room_members.get(room.name, {})),
         })
     return result
 
@@ -551,6 +551,30 @@ def create_room(
 
     return {"status": "created", "room": room_name}
 
+@app.get("/rooms/{room}/users")
+def list_room_users(
+    room: str,
+    room_token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    enforce_http_rate_limit(request, "list_room_users", 120, 60)
+
+    username = verify_room_token(room_token, room)
+    if not username:
+        raise HTTPException(status_code=403, detail="No access to this room")
+
+    existing_room = db.query(Room).filter(Room.name == room).first()
+    if not existing_room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    users = sorted(room_members.get(room, {}).keys(), key=str.lower)
+
+    return {
+        "room": room,
+        "count": len(users),
+        "users": users,
+    }
 
 @app.delete("/rooms/{room_name}")
 async def delete_room(
@@ -747,9 +771,12 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         return
 
     await manager.connect(websocket, room)
-    room_members[room].add(username)
 
-    await manager.broadcast_json(build_system_payload(room, username, "joined"), room)
+    was_offline = room_members[room][username] == 0
+    room_members[room][username] += 1
+
+    if was_offline:
+        await manager.broadcast_json(build_system_payload(room, username, "joined"), room)
 
     try:
         while True:
@@ -787,12 +814,21 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
 
     except WebSocketDisconnect:
         manager.disconnect(websocket, room)
+
+        went_offline = False
+
         if room in room_members and username in room_members[room]:
-            room_members[room].remove(username)
+            room_members[room][username] -= 1
+
+            if room_members[room][username] <= 0:
+                del room_members[room][username]
+                went_offline = True
+
             if not room_members[room]:
                 del room_members[room]
 
-        await manager.broadcast_json(build_system_payload(room, username, "left"), room)
+        if went_offline:
+            await manager.broadcast_json(build_system_payload(room, username, "left"), room)
 
 
 @app.get("/")
