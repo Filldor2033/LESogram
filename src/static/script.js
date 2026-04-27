@@ -767,7 +767,7 @@ function startRoomsAutoRefresh() {
     roomsRefreshTimer = setInterval(() => {
         if (!token || document.hidden) return;
         loadRooms();
-    }, 5000);
+    }, 10000);
 }
 
 function stopRoomsAutoRefresh() {
@@ -921,6 +921,11 @@ function renderRooms() {
         input.type = "password";
         input.placeholder = t("roomPasswordPlaceholder");
 
+        if (currentIsAdmin) {
+            input.placeholder = "";
+            input.required = false;
+        }
+
         const button = document.createElement("button");
         button.textContent = t("join");
         button.addEventListener("click", () => joinRoom(room.name, input));
@@ -942,7 +947,9 @@ function renderRooms() {
 
         item.appendChild(title);
         item.appendChild(meta);
-        item.appendChild(input);
+        if (!currentIsAdmin) {
+            item.appendChild(input);
+        }
         item.appendChild(actions);
 
         list.appendChild(item);
@@ -986,9 +993,9 @@ async function createRoom() {
 }
 
 async function joinRoom(roomName, pwdInput) {
-    const password = pwdInput.value.trim();
+    const password = pwdInput ? pwdInput.value.trim() : "";
 
-    if (!password) {
+    if (!password && !currentIsAdmin) {
         setStatus("roomStatus", t("enterRoomPassword"), true);
         return;
     }
@@ -996,7 +1003,10 @@ async function joinRoom(roomName, pwdInput) {
     const res = await fetch("/rooms/join", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ room: roomName, password })
+        body: JSON.stringify({
+            room: roomName,
+            password: password
+        })
     });
 
     const data = await safeJson(res);
@@ -1375,7 +1385,7 @@ function logout() {
     setStatus("roomStatus", "");
     showLoggedOutState();
 
-   
+
 }
 
 async function initializeSession() {

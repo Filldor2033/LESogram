@@ -722,7 +722,7 @@ def join_room(
     payload: JoinRoomRequest,
     request: Request,
     db: Session = Depends(get_db),
-    username: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_model),
 ):
     enforce_http_rate_limit(request, "join_room", 30, 300)
 
@@ -732,11 +732,12 @@ def join_room(
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if not verify_password(payload.password, room.password_hash):
-        raise HTTPException(status_code=403, detail="Wrong room password")
+    if not current_user.is_admin:
+        if not verify_password(payload.password, room.password_hash):
+            raise HTTPException(status_code=403, detail="Wrong room password")
 
     access_token = create_access_token({
-        "sub": username,
+        "sub": current_user.username,
         "room": room_name,
         "type": "room_access",
     })

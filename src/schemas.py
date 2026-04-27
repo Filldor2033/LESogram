@@ -33,7 +33,7 @@ class TokenResponse(BaseModel):
 
 class CreateRoomRequest(BaseModel):
     name: str = Field(min_length=3, max_length=100)
-    password: str = Field(min_length=1, max_length=72)
+    password: str = Field(min_length=3, max_length=72)
 
     @field_validator("name")
     @classmethod
@@ -50,7 +50,7 @@ class CreateRoomRequest(BaseModel):
 
 class JoinRoomRequest(BaseModel):
     room: str = Field(min_length=3, max_length=100)
-    password: str = Field(min_length=1, max_length=72)
+    password: str = ""
 
     @field_validator("room")
     @classmethod
