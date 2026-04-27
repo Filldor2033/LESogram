@@ -225,6 +225,7 @@ let roomsListCollapsed = false;
 let allRooms = [];
 let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
+let roomsRefreshTimer = null;
 
 function getInitialLanguage() {
     const saved = localStorage.getItem("language");
@@ -662,6 +663,22 @@ async function safeJson(res) {
     }
 }
 
+function startRoomsAutoRefresh() {
+    stopRoomsAutoRefresh();
+
+    roomsRefreshTimer = setInterval(() => {
+        if (!token || document.hidden) return;
+        loadRooms();
+    }, 5000);
+}
+
+function stopRoomsAutoRefresh() {
+    if (roomsRefreshTimer) {
+        clearInterval(roomsRefreshTimer);
+        roomsRefreshTimer = null;
+    }
+}
+
 async function auth(mode) {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
@@ -693,6 +710,7 @@ async function auth(mode) {
     showLoggedInState();
     setStatus("authStatus", "");
     await loadRooms();
+    startRoomsAutoRefresh();
 }
 
 async function loadRooms() {
@@ -1126,6 +1144,8 @@ async function leaveChat() {
 }
 
 function logout() {
+    stopRoomsAutoRefresh();
+
     resetActiveRoomState();
     token = "";
     currentUser = "";
@@ -1147,6 +1167,13 @@ async function initializeSession() {
 
     showLoggedInState();
     await loadRooms();
+    startRoomsAutoRefresh();
 }
+
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && token) {
+        loadRooms();
+    }
+});
 
 initializeSession();
