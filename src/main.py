@@ -140,6 +140,27 @@ class SlidingWindowRateLimiter:
 
 rate_limiter = SlidingWindowRateLimiter()
 
+def ensure_user_schema():
+    with engine.begin() as conn:
+        tables = {
+            row[0]
+            for row in conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+
+        if "users" not in tables:
+            return
+
+        columns = {
+            row["name"]
+            for row in conn.exec_driver_sql("PRAGMA table_info(users)").mappings().all()
+        }
+
+        if "is_admin" not in columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"
+            )
 
 def ensure_message_schema():
     with engine.begin() as conn:
@@ -187,6 +208,7 @@ def ensure_message_schema():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_user_schema()
     ensure_message_schema()
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     yield
@@ -246,6 +268,16 @@ def get_current_user(authorization: str | None = Header(default=None)) -> str:
         raise HTTPException(status_code=401, detail="Invalid token")
     return username
 
+def get_current_user_model(
+    username: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    user = db.query(User).filter(User.username == username).first()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return user
 
 def get_client_ip_from_request(request: Request) -> str:
     return request.client.host if request.client and request.client.host else "unknown"
@@ -465,6 +497,14 @@ def websocket_origin_allowed(websocket: WebSocket) -> bool:
     origin_host = parsed.netloc.lower()
     return origin_host == host.lower()
 
+@app.get("/me")
+def get_me(
+    current_user: User = Depends(get_current_user_model),
+):
+    return {
+        "username": current_user.username,
+        "is_admin": bool(current_user.is_admin),
+    }
 
 @app.post("/register")
 def register(
@@ -568,7 +608,29 @@ def list_room_users(
     if not existing_room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    users = sorted(room_members.get(room, {}).keys(), key=str.lower)
+    usernames = sorted(room_members.get(room, {}).keys(), key=str.lower)
+
+    admin_map = {}
+
+    if usernames:
+        rows = (
+            db.query(User.username, User.is_admin)
+            .filter(User.username.in_(usernames))
+            .all()
+        )
+
+        admin_map = {
+            row.username: bool(row.is_admin)
+            for row in rows
+        }
+
+    users = [
+        {
+            "username": name,
+            "is_admin": admin_map.get(name, False),
+        }
+        for name in usernames
+    ]
 
     return {
         "room": room,
@@ -581,7 +643,7 @@ async def delete_room(
     room_name: str,
     request: Request,
     db: Session = Depends(get_db),
-    username: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_model),
 ):
     enforce_http_rate_limit(request, "delete_room", 10, 300)
 
@@ -589,21 +651,71 @@ async def delete_room(
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if room.created_by != username:
-        raise HTTPException(status_code=403, detail="Only the creator can delete this room")
+    if room.created_by != current_user.username and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only the creator or admin can delete this room")
 
     messages = db.query(Message).filter(Message.room == room_name).all()
     remove_room_uploads(messages)
+
     db.query(Message).filter(Message.room == room_name).delete(synchronize_session=False)
     db.delete(room)
     db.commit()
 
-    await manager.broadcast_json(build_system_payload(room_name, username, "room_deleted"), room_name)
+    await manager.broadcast_json(
+        build_system_payload(room_name, current_user.username, "room_deleted"),
+        room_name
+    )
+
     room_members.pop(room_name, None)
     await manager.close_room(room_name)
 
     return {"status": "deleted", "room": room_name}
 
+@app.delete("/messages/{message_id}")
+async def delete_message(
+    message_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_model),
+):
+    enforce_http_rate_limit(request, "delete_message", 60, 60)
+
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete messages")
+
+    message = db.query(Message).filter(Message.id == message_id).first()
+
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    room_name = message.room
+    deleted_message_id = message.id
+
+    file_path = build_attachment_path(message.media_url)
+    if file_path and file_path.exists() and file_path.is_file():
+        try:
+            file_path.unlink()
+        except OSError:
+            pass
+
+    db.delete(message)
+    db.commit()
+
+    await manager.broadcast_json(
+        {
+            "type": "message_deleted",
+            "room": room_name,
+            "message_id": deleted_message_id,
+            "deleted_by": current_user.username,
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+        room_name,
+    )
+
+    return {
+        "status": "deleted",
+        "message_id": deleted_message_id,
+    }
 
 @app.post("/rooms/join")
 def join_room(

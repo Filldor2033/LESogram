@@ -12,6 +12,9 @@ const translations = {
         login: "Login",
         register: "Register",
         logout: "Exit",
+        adminBadge: "Admin",
+        youBadge: "you",
+        onlineBadge: "online",
         createRoomTitle: "Create Room",
         newRoomNamePlaceholder: "New room name",
         roomPasswordPlaceholder: "Room password",
@@ -114,6 +117,9 @@ const translations = {
         login: "Войти",
         register: "Регистрация",
         logout: "Выйти",
+        adminBadge: "Админ",
+        youBadge: "вы",
+        onlineBadge: "онлайн",
         createRoomTitle: "Создать комнату",
         newRoomNamePlaceholder: "Название новой комнаты",
         roomPasswordPlaceholder: "Пароль комнаты",
@@ -234,6 +240,30 @@ let allRooms = [];
 let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
 let roomsRefreshTimer = null;
+let currentIsAdmin = localStorage.getItem("is_admin") === "1";
+
+async function loadMe() {
+    const res = await fetch("/me", {
+        headers: authHeaders({ json: false })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        if (res.status === 401) {
+            logout();
+        }
+        return false;
+    }
+
+    currentUser = data.username;
+    currentIsAdmin = Boolean(data.is_admin);
+
+    localStorage.setItem("username", currentUser);
+    localStorage.setItem("is_admin", currentIsAdmin ? "1" : "0");
+
+    return true;
+}
 
 function getInitialLanguage() {
     const saved = localStorage.getItem("language");
@@ -323,6 +353,14 @@ function setInputPlaceholder(id, key) {
     if (el) {
         el.placeholder = t(key);
     }
+}
+
+function updateTopAdminBadge() {
+    const badge = document.getElementById("adminTopBadge");
+    if (!badge) return;
+
+    badge.textContent = `👑 ${t("adminBadge")}`;
+    badge.classList.toggle("hidden", !currentIsAdmin);
 }
 
 function updateLanguageButtons() {
@@ -427,6 +465,7 @@ function applyTranslations() {
     updateLanguageButtons();
     updateChatHeader();
     updateRoomsCount();
+    updateTopAdminBadge();
     renderChatEmptyState();
     toggleChatEmptyState();
     refreshRuntimeTranslations();
@@ -590,6 +629,10 @@ function addMessage(payload) {
     const chat = document.getElementById("chat");
     const div = document.createElement("div");
 
+    if (payload.id) {
+        div.dataset.messageId = String(payload.id);
+    }
+
     if (payload.type === "system") {
         div.className = "msg system";
         if (payload.system_event) {
@@ -599,6 +642,7 @@ function addMessage(payload) {
             div.dataset.systemActor = payload.system_actor;
         }
         div.innerText = getSystemMessageText(payload);
+
         chat.appendChild(div);
         toggleChatEmptyState();
         scrollChatToBottom();
@@ -633,9 +677,47 @@ function addMessage(payload) {
     meta.innerText = formatTime(payload.timestamp);
     div.appendChild(meta);
 
+    if (currentIsAdmin && payload.id) {
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "secondary small-btn msg-delete-btn";
+        deleteButton.textContent = t("delete");
+        deleteButton.type = "button";
+        deleteButton.addEventListener("click", () => deleteMessage(payload.id));
+
+        div.appendChild(deleteButton);
+    }
+
     chat.appendChild(div);
     toggleChatEmptyState();
     scrollChatToBottom();
+}
+
+async function deleteMessage(messageId) {
+    if (!currentIsAdmin) return;
+
+    const res = await fetch(`/messages/${encodeURIComponent(messageId)}`, {
+        method: "DELETE",
+        headers: authHeaders({ json: false })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        setComposerStatus(getApiErrorMessage(data, "cannotDeleteRoom"), true);
+        return;
+    }
+
+    removeMessageFromChat(messageId);
+}
+
+function removeMessageFromChat(messageId) {
+    document.querySelectorAll(".msg[data-message-id]").forEach((node) => {
+        if (node.dataset.messageId === String(messageId)) {
+            node.remove();
+        }
+    });
+
+    toggleChatEmptyState();
 }
 
 function clearChat() {
@@ -662,6 +744,8 @@ function showLoggedInState() {
     document.getElementById("authSection").classList.add("hidden");
     document.getElementById("roomsSection").classList.remove("hidden");
     document.getElementById("whoami").innerText = currentUser;
+
+    updateTopAdminBadge();
 }
 
 function showLoggedOutState() {
@@ -720,6 +804,8 @@ async function auth(mode) {
 
     localStorage.setItem("token", token);
     localStorage.setItem("username", username);
+
+    await loadMe();
 
     showLoggedInState();
     setStatus("authStatus", "");
@@ -843,7 +929,7 @@ function renderRooms() {
         actions.className = "room-actions";
         actions.appendChild(button);
 
-        if (room.created_by === currentUser) {
+        if (room.created_by === currentUser || currentIsAdmin) {
             const deleteButton = document.createElement("button");
             deleteButton.className = "danger";
             deleteButton.textContent = t("delete");
@@ -990,6 +1076,11 @@ function connectWS() {
             return;
         }
 
+        if (payload.type === "message_deleted") {
+            removeMessageFromChat(payload.message_id);
+            return;
+        }
+
         addMessage(payload);
         if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
             loadRoomUsers();
@@ -1132,7 +1223,10 @@ function renderUsersList(users) {
         return;
     }
 
-    for (const username of users) {
+    for (const user of users) {
+        const username = typeof user === "string" ? user : user.username;
+        const isAdmin = typeof user === "object" && Boolean(user.is_admin);
+
         const item = document.createElement("div");
         item.className = "user-item";
 
@@ -1144,13 +1238,24 @@ function renderUsersList(users) {
         name.className = "user-name";
         name.textContent = username;
 
-        const badge = document.createElement("div");
-        badge.className = "user-badge";
-        badge.textContent = username === currentUser ? "you" : "online";
+        const badges = document.createElement("div");
+        badges.className = "user-badges";
+
+        if (isAdmin) {
+            const adminBadge = document.createElement("div");
+            adminBadge.className = "user-admin-badge";
+            adminBadge.textContent = `👑 ${t("adminBadge")}`;
+            badges.appendChild(adminBadge);
+        }
+
+        const statusBadge = document.createElement("div");
+        statusBadge.className = "user-badge";
+        statusBadge.textContent = username === currentUser ? t("youBadge") : t("onlineBadge");
+        badges.appendChild(statusBadge);
 
         item.appendChild(avatar);
         item.appendChild(name);
-        item.appendChild(badge);
+        item.appendChild(badges);
 
         list.appendChild(item);
     }
@@ -1259,14 +1364,18 @@ function logout() {
     resetActiveRoomState();
     token = "";
     currentUser = "";
+    currentIsAdmin = false;
 
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    localStorage.removeItem("is_admin");
 
     document.getElementById("username").value = "";
     document.getElementById("password").value = "";
     setStatus("roomStatus", "");
     showLoggedOutState();
+
+   
 }
 
 async function initializeSession() {
@@ -1274,6 +1383,9 @@ async function initializeSession() {
     clearChat();
 
     if (!token || !currentUser) return;
+
+    const ok = await loadMe();
+    if (!ok) return;
 
     showLoggedInState();
     await loadRooms();

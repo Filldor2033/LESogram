@@ -43,8 +43,12 @@
 
             <div class="section hidden" id="roomsSection">
                 <div class="topbar">
-                    <div><b id="whoami"></b></div>
-                    <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
+                    <div class="whoami-row">
+                    <b id="whoami"></b>
+                    <span id="adminTopBadge" class="admin-badge hidden">👑 Admin</span>
+                </div>
+
+                <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
                 </div>
 
                 <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
