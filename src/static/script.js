@@ -255,6 +255,15 @@ function formatRoomCount(count) {
     return count === 1 ? t("roomCount_one", { count }) : t("roomCount_many", { count });
 }
 
+function scrollChatToBottom() {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    requestAnimationFrame(() => {
+        chat.scrollTop = chat.scrollHeight;
+    });
+}
+
 function translateApiDetail(detail) {
     if (!detail) return "";
     if (typeof detail !== "string") return "";
@@ -490,6 +499,7 @@ function buildAttachmentNode(payload) {
         img.src = resolvedUrl;
         img.alt = payload.file_name || t("attachmentLabel");
         img.loading = "lazy";
+        img.onload = scrollChatToBottom;
 
         media.appendChild(img);
         return media;
@@ -503,6 +513,7 @@ function buildAttachmentNode(payload) {
         video.src = resolvedUrl;
         video.controls = true;
         video.preload = "metadata";
+        video.onloadedmetadata = scrollChatToBottom;
 
         media.appendChild(video);
         return media;
@@ -575,7 +586,7 @@ function addMessage(payload) {
         div.innerText = getSystemMessageText(payload);
         chat.appendChild(div);
         toggleChatEmptyState();
-        chat.scrollTop = chat.scrollHeight;
+        scrollChatToBottom();
         return;
     }
 
@@ -609,7 +620,7 @@ function addMessage(payload) {
 
     chat.appendChild(div);
     toggleChatEmptyState();
-    chat.scrollTop = chat.scrollHeight;
+    scrollChatToBottom();
 }
 
 function clearChat() {

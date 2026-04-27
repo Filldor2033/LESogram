@@ -1,7 +1,7 @@
 import re
 from pydantic import BaseModel, Field, field_validator
 
-SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\- ]+$")
+SAFE_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9 _.-]+$")
 
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
@@ -39,10 +39,13 @@ class CreateRoomRequest(BaseModel):
     @classmethod
     def validate_name(cls, v: str):
         v = v.strip()
-        if not v:
-            raise ValueError("Room name cannot be empty")
-        if not SAFE_NAME_RE.fullmatch(v):
-            raise ValueError("Room name contains invalid characters")
+
+        if len(v) < 3:
+            raise ValueError("Room name must be at least 3 characters")
+
+        if any(ch in "\n\r\t" for ch in v):
+            raise ValueError("Room name cannot contain newlines or tabs")
+
         return v
 
 class JoinRoomRequest(BaseModel):
