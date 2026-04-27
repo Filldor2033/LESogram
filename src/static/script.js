@@ -225,6 +225,7 @@ let roomsListCollapsed = false;
 let allRooms = [];
 let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
+let roomsRefreshTimer = null;
 
 function getInitialLanguage() {
     const saved = localStorage.getItem("language");
@@ -253,6 +254,15 @@ function formatRoomCount(count) {
         return form;
     }
     return count === 1 ? t("roomCount_one", { count }) : t("roomCount_many", { count });
+}
+
+function scrollChatToBottom() {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    requestAnimationFrame(() => {
+        chat.scrollTop = chat.scrollHeight;
+    });
 }
 
 function translateApiDetail(detail) {
@@ -490,6 +500,7 @@ function buildAttachmentNode(payload) {
         img.src = resolvedUrl;
         img.alt = payload.file_name || t("attachmentLabel");
         img.loading = "lazy";
+        img.onload = scrollChatToBottom;
 
         media.appendChild(img);
         return media;
@@ -503,6 +514,7 @@ function buildAttachmentNode(payload) {
         video.src = resolvedUrl;
         video.controls = true;
         video.preload = "metadata";
+        video.onloadedmetadata = scrollChatToBottom;
 
         media.appendChild(video);
         return media;
@@ -575,7 +587,7 @@ function addMessage(payload) {
         div.innerText = getSystemMessageText(payload);
         chat.appendChild(div);
         toggleChatEmptyState();
-        chat.scrollTop = chat.scrollHeight;
+        scrollChatToBottom();
         return;
     }
 
@@ -609,7 +621,7 @@ function addMessage(payload) {
 
     chat.appendChild(div);
     toggleChatEmptyState();
-    chat.scrollTop = chat.scrollHeight;
+    scrollChatToBottom();
 }
 
 function clearChat() {
@@ -651,6 +663,22 @@ async function safeJson(res) {
     }
 }
 
+function startRoomsAutoRefresh() {
+    stopRoomsAutoRefresh();
+
+    roomsRefreshTimer = setInterval(() => {
+        if (!token || document.hidden) return;
+        loadRooms();
+    }, 5000);
+}
+
+function stopRoomsAutoRefresh() {
+    if (roomsRefreshTimer) {
+        clearInterval(roomsRefreshTimer);
+        roomsRefreshTimer = null;
+    }
+}
+
 async function auth(mode) {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
@@ -682,6 +710,7 @@ async function auth(mode) {
     showLoggedInState();
     setStatus("authStatus", "");
     await loadRooms();
+    startRoomsAutoRefresh();
 }
 
 async function loadRooms() {
@@ -1115,6 +1144,8 @@ async function leaveChat() {
 }
 
 function logout() {
+    stopRoomsAutoRefresh();
+
     resetActiveRoomState();
     token = "";
     currentUser = "";
@@ -1136,6 +1167,13 @@ async function initializeSession() {
 
     showLoggedInState();
     await loadRooms();
+    startRoomsAutoRefresh();
 }
+
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && token) {
+        loadRooms();
+    }
+});
 
 initializeSession();
