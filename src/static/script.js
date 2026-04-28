@@ -1,5 +1,9 @@
 const translations = {
     en: {
+        users: "Users",
+        onlineUsers: "Online users",
+        noOnlineUsers: "No users online",
+        close: "Close",
         appTitle: "LESogram",
         brandSubtitle: "Fast rooms, live messages, simple sharing",
         authTitle: "Account",
@@ -8,6 +12,9 @@ const translations = {
         login: "Login",
         register: "Register",
         logout: "Exit",
+        adminBadge: "Admin",
+        youBadge: "you",
+        onlineBadge: "online",
         createRoomTitle: "Create Room",
         newRoomNamePlaceholder: "New room name",
         roomPasswordPlaceholder: "Room password",
@@ -98,6 +105,10 @@ const translations = {
         apiTooManyRequests: "Too many requests. Retry in {seconds} seconds"
     },
     ru: {
+        users: "Участники",
+        onlineUsers: "Пользователи онлайн",
+        noOnlineUsers: "Нет пользователей онлайн",
+        close: "Закрыть",
         appTitle: "LESogram",
         brandSubtitle: "Быстрые комнаты, живые сообщения и удобная отправка файлов",
         authTitle: "Аккаунт",
@@ -106,14 +117,17 @@ const translations = {
         login: "Войти",
         register: "Регистрация",
         logout: "Выйти",
+        adminBadge: "Админ",
+        youBadge: "вы",
+        onlineBadge: "онлайн",
         createRoomTitle: "Создать комнату",
         newRoomNamePlaceholder: "Название новой комнаты",
         roomPasswordPlaceholder: "Пароль комнаты",
         createRoom: "Создать комнату",
         roomListTitle: "Список комнат",
         roomListSubtitle: "Выберите и подключитесь",
-        hideList: "Скрыть список",
-        showList: "Показать список",
+        hideList: "Скрыть",
+        showList: "Показать",
         roomSearchPlaceholder: "Поиск по названию комнаты...",
         creatorSearchPlaceholder: "Поиск по создателю...",
         allRooms: "Все комнаты",
@@ -226,6 +240,30 @@ let allRooms = [];
 let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
 let roomsRefreshTimer = null;
+let currentIsAdmin = localStorage.getItem("is_admin") === "1";
+
+async function loadMe() {
+    const res = await fetch("/me", {
+        headers: authHeaders({ json: false })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        if (res.status === 401) {
+            logout();
+        }
+        return false;
+    }
+
+    currentUser = data.username;
+    currentIsAdmin = Boolean(data.is_admin);
+
+    localStorage.setItem("username", currentUser);
+    localStorage.setItem("is_admin", currentIsAdmin ? "1" : "0");
+
+    return true;
+}
 
 function getInitialLanguage() {
     const saved = localStorage.getItem("language");
@@ -315,6 +353,14 @@ function setInputPlaceholder(id, key) {
     if (el) {
         el.placeholder = t(key);
     }
+}
+
+function updateTopAdminBadge() {
+    const badge = document.getElementById("adminTopBadge");
+    if (!badge) return;
+
+    badge.textContent = `👑 ${t("adminBadge")}`;
+    badge.classList.toggle("hidden", !currentIsAdmin);
 }
 
 function updateLanguageButtons() {
@@ -410,9 +456,16 @@ function applyTranslations() {
     document.getElementById("sortOnlineAsc").textContent = t("sortOnlineAsc");
     document.getElementById("sortCreatorAsc").textContent = t("sortCreatorAsc");
 
+    setButtonText("roomUsersBtn", "users");
+    const usersTitle = document.getElementById("usersPopupTitle");
+    if (usersTitle) {
+        usersTitle.textContent = t("onlineUsers");
+    }
+
     updateLanguageButtons();
     updateChatHeader();
     updateRoomsCount();
+    updateTopAdminBadge();
     renderChatEmptyState();
     toggleChatEmptyState();
     refreshRuntimeTranslations();
@@ -576,6 +629,10 @@ function addMessage(payload) {
     const chat = document.getElementById("chat");
     const div = document.createElement("div");
 
+    if (payload.id) {
+        div.dataset.messageId = String(payload.id);
+    }
+
     if (payload.type === "system") {
         div.className = "msg system";
         if (payload.system_event) {
@@ -585,6 +642,7 @@ function addMessage(payload) {
             div.dataset.systemActor = payload.system_actor;
         }
         div.innerText = getSystemMessageText(payload);
+
         chat.appendChild(div);
         toggleChatEmptyState();
         scrollChatToBottom();
@@ -619,9 +677,47 @@ function addMessage(payload) {
     meta.innerText = formatTime(payload.timestamp);
     div.appendChild(meta);
 
+    if (currentIsAdmin && payload.id) {
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "secondary small-btn msg-delete-btn";
+        deleteButton.textContent = t("delete");
+        deleteButton.type = "button";
+        deleteButton.addEventListener("click", () => deleteMessage(payload.id));
+
+        div.appendChild(deleteButton);
+    }
+
     chat.appendChild(div);
     toggleChatEmptyState();
     scrollChatToBottom();
+}
+
+async function deleteMessage(messageId) {
+    if (!currentIsAdmin) return;
+
+    const res = await fetch(`/messages/${encodeURIComponent(messageId)}`, {
+        method: "DELETE",
+        headers: authHeaders({ json: false })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        setComposerStatus(getApiErrorMessage(data, "cannotDeleteRoom"), true);
+        return;
+    }
+
+    removeMessageFromChat(messageId);
+}
+
+function removeMessageFromChat(messageId) {
+    document.querySelectorAll(".msg[data-message-id]").forEach((node) => {
+        if (node.dataset.messageId === String(messageId)) {
+            node.remove();
+        }
+    });
+
+    toggleChatEmptyState();
 }
 
 function clearChat() {
@@ -648,6 +744,8 @@ function showLoggedInState() {
     document.getElementById("authSection").classList.add("hidden");
     document.getElementById("roomsSection").classList.remove("hidden");
     document.getElementById("whoami").innerText = currentUser;
+
+    updateTopAdminBadge();
 }
 
 function showLoggedOutState() {
@@ -669,7 +767,7 @@ function startRoomsAutoRefresh() {
     roomsRefreshTimer = setInterval(() => {
         if (!token || document.hidden) return;
         loadRooms();
-    }, 5000);
+    }, 10000);
 }
 
 function stopRoomsAutoRefresh() {
@@ -706,6 +804,8 @@ async function auth(mode) {
 
     localStorage.setItem("token", token);
     localStorage.setItem("username", username);
+
+    await loadMe();
 
     showLoggedInState();
     setStatus("authStatus", "");
@@ -821,6 +921,11 @@ function renderRooms() {
         input.type = "password";
         input.placeholder = t("roomPasswordPlaceholder");
 
+        if (currentIsAdmin) {
+            input.placeholder = "";
+            input.required = false;
+        }
+
         const button = document.createElement("button");
         button.textContent = t("join");
         button.addEventListener("click", () => joinRoom(room.name, input));
@@ -829,7 +934,7 @@ function renderRooms() {
         actions.className = "room-actions";
         actions.appendChild(button);
 
-        if (room.created_by === currentUser) {
+        if (room.created_by === currentUser || currentIsAdmin) {
             const deleteButton = document.createElement("button");
             deleteButton.className = "danger";
             deleteButton.textContent = t("delete");
@@ -842,7 +947,9 @@ function renderRooms() {
 
         item.appendChild(title);
         item.appendChild(meta);
-        item.appendChild(input);
+        if (!currentIsAdmin) {
+            item.appendChild(input);
+        }
         item.appendChild(actions);
 
         list.appendChild(item);
@@ -886,9 +993,9 @@ async function createRoom() {
 }
 
 async function joinRoom(roomName, pwdInput) {
-    const password = pwdInput.value.trim();
+    const password = pwdInput ? pwdInput.value.trim() : "";
 
-    if (!password) {
+    if (!password && !currentIsAdmin) {
         setStatus("roomStatus", t("enterRoomPassword"), true);
         return;
     }
@@ -896,7 +1003,10 @@ async function joinRoom(roomName, pwdInput) {
     const res = await fetch("/rooms/join", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ room: roomName, password })
+        body: JSON.stringify({
+            room: roomName,
+            password: password
+        })
     });
 
     const data = await safeJson(res);
@@ -910,6 +1020,7 @@ async function joinRoom(roomName, pwdInput) {
     currentRoomToken = data.room_token;
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.remove("hidden");
+    document.getElementById("roomUsersBtn").classList.remove("hidden");
 
     clearChat();
     connectWS();
@@ -975,7 +1086,15 @@ function connectWS() {
             return;
         }
 
+        if (payload.type === "message_deleted") {
+            removeMessageFromChat(payload.message_id);
+            return;
+        }
+
         addMessage(payload);
+        if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
+            loadRoomUsers();
+        }
     };
 
     socket.onclose = () => {
@@ -1069,6 +1188,110 @@ async function deleteRoom(roomName) {
     await loadRooms();
 }
 
+async function loadRoomUsers() {
+    if (!currentRoom || !currentRoomToken) return;
+
+    const list = document.getElementById("usersList");
+    const subtitle = document.getElementById("usersPopupSubtitle");
+
+    if (!list || !subtitle) return;
+
+    list.innerHTML = `<div class="users-loading">...</div>`;
+
+    try {
+        const res = await fetch(
+            `/rooms/${encodeURIComponent(currentRoom)}/users?room_token=${encodeURIComponent(currentRoomToken)}`
+        );
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            list.innerHTML = `<div class="users-empty">${getApiErrorMessage(data, "cannotLoadRooms")}</div>`;
+            subtitle.textContent = formatRoomCount(0);
+            return;
+        }
+
+        subtitle.textContent = formatRoomCount(data.count || 0);
+        renderUsersList(data.users || []);
+    } catch {
+        list.innerHTML = `<div class="users-empty">${t("cannotLoadRooms")}</div>`;
+        subtitle.textContent = formatRoomCount(0);
+    }
+}
+
+function renderUsersList(users) {
+    const list = document.getElementById("usersList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!users.length) {
+        const empty = document.createElement("div");
+        empty.className = "users-empty";
+        empty.textContent = t("noOnlineUsers");
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const user of users) {
+        const username = typeof user === "string" ? user : user.username;
+        const isAdmin = typeof user === "object" && Boolean(user.is_admin);
+
+        const item = document.createElement("div");
+        item.className = "user-item";
+
+        const avatar = document.createElement("div");
+        avatar.className = "user-avatar";
+        avatar.textContent = username.slice(0, 1).toUpperCase();
+
+        const name = document.createElement("div");
+        name.className = "user-name";
+        name.textContent = username;
+
+        const badges = document.createElement("div");
+        badges.className = "user-badges";
+
+        if (isAdmin) {
+            const adminBadge = document.createElement("div");
+            adminBadge.className = "user-admin-badge";
+            adminBadge.textContent = `👑 ${t("adminBadge")}`;
+            badges.appendChild(adminBadge);
+        }
+
+        const statusBadge = document.createElement("div");
+        statusBadge.className = "user-badge";
+        statusBadge.textContent = username === currentUser ? t("youBadge") : t("onlineBadge");
+        badges.appendChild(statusBadge);
+
+        item.appendChild(avatar);
+        item.appendChild(name);
+        item.appendChild(badges);
+
+        list.appendChild(item);
+    }
+}
+
+function toggleUsersPopup() {
+    const popup = document.getElementById("usersPopup");
+    if (!popup) return;
+
+    const willOpen = popup.classList.contains("hidden");
+
+    if (willOpen) {
+        popup.classList.remove("hidden");
+        loadRoomUsers();
+    } else {
+        popup.classList.add("hidden");
+    }
+}
+
+function closeUsersPopup() {
+    const popup = document.getElementById("usersPopup");
+    if (popup) {
+        popup.classList.add("hidden");
+    }
+}
+
 function resetActiveRoomState() {
     if (ws) {
         suppressNextWsCloseStatus = true;
@@ -1081,6 +1304,8 @@ function resetActiveRoomState() {
 
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");
+    document.getElementById("roomUsersBtn").classList.add("hidden");
+    closeUsersPopup();
     document.getElementById("message").value = "";
     clearChat();
     setRoomsListCollapsed(false);
@@ -1149,14 +1374,18 @@ function logout() {
     resetActiveRoomState();
     token = "";
     currentUser = "";
+    currentIsAdmin = false;
 
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    localStorage.removeItem("is_admin");
 
     document.getElementById("username").value = "";
     document.getElementById("password").value = "";
     setStatus("roomStatus", "");
     showLoggedOutState();
+
+
 }
 
 async function initializeSession() {
@@ -1164,6 +1393,9 @@ async function initializeSession() {
     clearChat();
 
     if (!token || !currentUser) return;
+
+    const ok = await loadMe();
+    if (!ok) return;
 
     showLoggedInState();
     await loadRooms();
