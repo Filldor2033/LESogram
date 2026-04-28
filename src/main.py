@@ -1,6 +1,6 @@
 from collections import Counter, defaultdict, deque
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 import mimetypes
 import os
 from pathlib import Path
@@ -36,7 +36,6 @@ from schemas import (
     RegisterRequest,
     TokenResponse,
 )
-
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -111,6 +110,8 @@ DANGEROUS_MIME_TYPES = {
     "image/svg+xml",
 }
 
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class SlidingWindowRateLimiter:
     def __init__(self):
@@ -439,7 +440,7 @@ def build_system_payload(room: str, actor: str, event: str) -> dict:
         "type": "system",
         "text": fallback_text,
         "room": room,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utc_now().isoformat(),
         "system_event": event,
         "system_actor": actor,
     }
@@ -707,7 +708,7 @@ async def delete_message(
             "room": room_name,
             "message_id": deleted_message_id,
             "deleted_by": current_user.username,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
         },
         room_name,
     )
@@ -905,7 +906,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                     "type": "system",
                     "text": "Rate limit exceeded",
                     "room": room,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": utc_now().isoformat(),
                     "system_event": "rate_limited",
                     "system_actor": username,
                 })

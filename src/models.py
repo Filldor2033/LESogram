@@ -1,6 +1,9 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
-from datetime import datetime
+from datetime import datetime, timezone
 from database import Base
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class User(Base):
     __tablename__ = "users"
@@ -19,7 +22,7 @@ class Room(Base):
     name = Column(String(100), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     created_by = Column(String(50), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
 class Message(Base):
@@ -34,4 +37,4 @@ class Message(Base):
     file_name = Column(String(255), nullable=True)
     mime_type = Column(String(255), nullable=True)
     file_size = Column(Integer, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime(timezone=True), default=utc_now, nullable=False)
