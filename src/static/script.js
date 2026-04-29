@@ -670,6 +670,15 @@ function createMessageNode(payload) {
     meta.innerText = formatTime(payload.timestamp);
     div.appendChild(meta);
 
+    if (currentIsAdmin && payload.id) {
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "secondary small-btn msg-delete-btn";
+        deleteButton.textContent = t("delete");
+        deleteButton.type = "button";
+        deleteButton.addEventListener("click", () => deleteMessage(payload.id));
+        div.appendChild(deleteButton);
+    }
+
     return div;
 }
 
