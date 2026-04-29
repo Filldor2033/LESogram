@@ -51,10 +51,7 @@ body {
     align-items: stretch;
 
     padding:
-        max(var(--page-padding), env(safe-area-inset-top))
-        max(var(--page-padding), env(safe-area-inset-right))
-        max(var(--page-padding), env(safe-area-inset-bottom))
-        max(var(--page-padding), env(safe-area-inset-left));
+        max(var(--page-padding), env(safe-area-inset-top)) max(var(--page-padding), env(safe-area-inset-right)) max(var(--page-padding), env(safe-area-inset-bottom)) max(var(--page-padding), env(safe-area-inset-left));
 
     overflow: hidden;
 }
@@ -954,6 +951,39 @@ body {
         bottom: 0;
         z-index: 10;
     }
+
+    .container {
+        min-height: auto;
+    }
+
+    .panel,
+    .chat-panel {
+        border-radius: 18px;
+        overflow: hidden;
+    }
+
+    .header {
+        border-radius: 0;
+    }
+
+    .section-block,
+    .room-item,
+    .chat-empty,
+    .users-card {
+        border-radius: 16px;
+    }
+
+    .composer {
+        border-radius: 0;
+    }
+
+    .users-popup {
+        position: fixed;
+        top: 90px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
 }
 
 
@@ -1016,6 +1046,7 @@ body {
 }
 
 @media (hover: none) {
+
     button:hover,
     .room-item:hover {
         transform: none;
@@ -1027,11 +1058,70 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
         scroll-behavior: auto !important;
         transition: none !important;
         animation: none !important;
+    }
+}
+
+/* mobile radius fix */
+@media (max-width: 900px) {
+    .container {
+        min-height: auto;
+    }
+
+    .panel,
+    .chat-panel {
+        border-radius: 18px;
+        overflow: hidden;
+    }
+
+    .header {
+        border-radius: 0;
+    }
+
+    .section-block,
+    .room-item,
+    .chat-empty,
+    .users-card {
+        border-radius: 16px;
+    }
+
+    .composer {
+        border-radius: 0;
+    }
+
+    .users-popup {
+        position: fixed;
+        top: 90px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+}
+
+@media (max-width: 420px) {
+
+    .panel,
+    .chat-panel {
+        border-radius: 14px;
+    }
+
+    .section-block,
+    .room-item,
+    .chat-empty {
+        border-radius: 14px;
+    }
+
+    .section {
+        padding: 14px;
+    }
+
+    .header {
+        padding: 14px;
     }
 }
