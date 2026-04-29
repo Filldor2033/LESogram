@@ -30,6 +30,10 @@ const translations = {
         roomListSubtitle: "Browse and join",
         hideList: "Hide list",
         showList: "Show list",
+        notificationsOn: "Disable notifications",
+        notificationsOff: "Enable notifications",
+        notificationsEnabled: "Notifications enabled",
+        newMessageTitle: "New message in {room}",
         roomSearchPlaceholder: "Search by room name...",
         creatorSearchPlaceholder: "Search by creator...",
         allRooms: "All rooms",
@@ -144,6 +148,10 @@ const translations = {
         roomListSubtitle: "Выберите и подключитесь",
         hideList: "Скрыть",
         showList: "Показать",
+        notificationsOn: "Выключить уведомления",
+        notificationsOff: "Включить уведомления",
+        notificationsEnabled: "Уведомления включены",
+        newMessageTitle: "Новое сообщение в {room}",
         roomSearchPlaceholder: "Поиск по названию комнаты...",
         creatorSearchPlaceholder: "Поиск по создателю...",
         allRooms: "Все комнаты",
@@ -272,6 +280,8 @@ let typingRenderTimer = null;
 let messagesNextBeforeId = null;
 let messagesHasMore = true;
 let messagesLoading = false;
+
+let notificationsEnabled = localStorage.getItem("notifications_enabled") === "1";
 
 const messageCache = new Map();
 
@@ -651,6 +661,7 @@ function applyTranslations() {
     setButtonText("contextEditBtn", "edit");
     setButtonText("contextDeleteBtn", "delete");
     setButtonText("roomUsersBtn", "users");
+    setButtonText("notificationsBtn", "enableNotifications");
 
     setInputPlaceholder("username", "usernamePlaceholder");
     setInputPlaceholder("password", "passwordPlaceholder");
@@ -679,6 +690,7 @@ function applyTranslations() {
     setRoomsListCollapsed(roomsListCollapsed);
     closeMessageContextMenu();
     renderRooms();
+    updateNotificationsButton();
 }
 
 function setStatus(id, text, isError = false) {
@@ -831,6 +843,59 @@ function getSystemMessageText(payload) {
         return t("systemRateLimited");
     }
     return payload.text || "";
+}
+
+function updateNotificationsButton() {
+    const btn = document.getElementById("notificationsBtn");
+    if (!btn) return;
+
+    if (notificationsEnabled) {
+        btn.textContent = t("notificationsOn");
+        btn.classList.remove("secondary");
+    } else {
+        btn.textContent = t("notificationsOff");
+        btn.classList.add("secondary");
+    }
+}
+
+async function toggleNotifications() {
+    if (!("Notification" in window)) {
+        setComposerStatus("Notifications not supported", true);
+        return;
+    }
+
+    if (notificationsEnabled) {
+        notificationsEnabled = false;
+        localStorage.setItem("notifications_enabled", "0");
+        updateNotificationsButton();
+        return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission === "granted") {
+        notificationsEnabled = true;
+        localStorage.setItem("notifications_enabled", "1");
+        updateNotificationsButton();
+    }
+}
+
+function maybeNotify(payload) {
+    if (!notificationsEnabled) return;
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    if (!payload || payload.type !== "message") return;
+    if (payload.username === currentUser) return;
+
+    const isPageVisible = !document.hidden;
+    if (isPageVisible) return;
+
+    const body = payload.text || payload.file_name || t("attachmentLabel");
+
+    new Notification(t("newMessageTitle", { room: payload.room || currentRoom }), {
+        body,
+        tag: `room-${payload.room || currentRoom}`,
+    });
 }
 
 function createMessageNode(payload) {
@@ -1483,6 +1548,8 @@ function connectWS() {
             return;
         }
 
+        maybeNotify(payload);
+
         addMessage(payload);
         if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
             loadRoomUsers();
@@ -1794,6 +1861,9 @@ function logout() {
     token = "";
     currentUser = "";
     currentIsAdmin = false;
+    notificationsEnabled = false;
+
+    localStorage.removeItem("notifications_enabled");
 
     localStorage.removeItem("token");
     localStorage.removeItem("username");
@@ -1803,8 +1873,6 @@ function logout() {
     document.getElementById("password").value = "";
     setStatus("roomStatus", "");
     showLoggedOutState();
-
-
 }
 
 async function initializeSession() {
