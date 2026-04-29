@@ -476,6 +476,18 @@ def verify_room_token(token: str | None, room: str) -> str | None:
         return None
 
 
+async def require_room_access(room: str, room_token: str, db: AsyncSession):
+    username = verify_room_token(room_token, room)
+    if not username:
+        raise HTTPException(status_code=403, detail="No access to this room")
+
+    result = await db.execute(select(Room).where(Room.name == room))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    return username
+
+
 def normalize_message_text(text: str | None, *, allow_empty: bool) -> str:
     normalized = (text or "").strip()
 
@@ -751,9 +763,7 @@ async def list_room_users(
 ):
     enforce_http_rate_limit(request, "list_room_users", 120, 60)
 
-    username = verify_room_token(room_token, room)
-    if not username:
-        raise HTTPException(status_code=403, detail="No access to this room")
+    require_room_access(room, room_token, db)
 
     result = await db.execute(
         select(Room).where(Room.name == room)
@@ -841,6 +851,8 @@ async def delete_room(
         build_system_payload(room_name, current_user.username, "room_deleted"),
         room_name,
     )
+    await asyncio.sleep(0)
+    await manager.close_room(room_name)
 
     room_members.pop(room_name, None)
     await manager.close_room(room_name)
@@ -951,9 +963,7 @@ async def get_messages(
 ):
     enforce_http_rate_limit(request, "get_messages", 120, 60)
 
-    username = verify_room_token(room_token, room)
-    if not username:
-        raise HTTPException(status_code=403, detail="No access to this room")
+    require_room_access(room,room_token,db)
 
     query = select(Message).where(Message.room == room)
 
@@ -1070,7 +1080,7 @@ async def upload_attachment(
     stored_name = f"{secrets.token_hex(16)}{suffix}"
     stored_path = UPLOADS_DIR / stored_name
 
-    stored_path.write_bytes(content)
+    await asyncio.to_thread(stored_path.write_bytes, content)
 
     message = await save_message(
         db,
@@ -1115,6 +1125,15 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         user = result.scalar_one_or_none()
 
     if not user:
+        await websocket.close(code=1008)
+        return
+    
+    result = await db.execute(
+        select(Room).where(Room.name == room)
+    )
+    existing_room = result.scalar_one_or_none()
+
+    if not existing_room:
         await websocket.close(code=1008)
         return
 
