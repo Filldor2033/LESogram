@@ -3,6 +3,7 @@ const translations = {
         users: "Users",
         onlineUsers: "Online users",
         noOnlineUsers: "No users online",
+        reply: "Reply",
         close: "Close",
         appTitle: "LESogram",
         brandSubtitle: "Fast rooms, live messages, simple sharing",
@@ -108,6 +109,7 @@ const translations = {
         users: "Участники",
         onlineUsers: "Пользователи онлайн",
         noOnlineUsers: "Нет пользователей онлайн",
+        reply: "Ответить",
         close: "Закрыть",
         appTitle: "LESogram",
         brandSubtitle: "Быстрые комнаты, живые сообщения и удобная отправка файлов",
@@ -242,9 +244,12 @@ let suppressNextWsCloseStatus = false;
 let roomsRefreshTimer = null;
 let currentIsAdmin = localStorage.getItem("is_admin") === "1";
 let replyTarget = null;
+let contextMessage = null;
+let longPressTimer = null;
 let messagesNextBeforeId = null;
 let messagesHasMore = true;
 let messagesLoading = false;
+
 const messageCache = new Map();
 
 async function loadMe() {
@@ -360,6 +365,61 @@ function setInputPlaceholder(id, key) {
     }
 }
 
+function openMessageContextMenu(event, payload) {
+    event.preventDefault();
+
+    contextMessage = payload;
+
+    const menu = document.getElementById("messageContextMenu");
+    const deleteBtn = document.getElementById("contextDeleteBtn");
+
+    deleteBtn.classList.toggle("hidden", !(currentIsAdmin && payload.id));
+
+    menu.classList.remove("hidden");
+
+    const menuRect = menu.getBoundingClientRect();
+    const padding = 8;
+
+    let x = event.clientX;
+    let y = event.clientY;
+
+    if (x + menuRect.width > window.innerWidth - padding) {
+        x = window.innerWidth - menuRect.width - padding;
+    }
+
+    if (y + menuRect.height > window.innerHeight - padding) {
+        y = window.innerHeight - menuRect.height - padding;
+    }
+
+    menu.style.left = `${Math.max(padding, x)}px`;
+    menu.style.top = `${Math.max(padding, y)}px`;
+
+    menu.querySelector("button").textContent = t("reply");
+    deleteBtn.textContent = t("delete");
+}
+
+function closeMessageContextMenu() {
+    const menu = document.getElementById("messageContextMenu");
+    menu.classList.add("hidden");
+    contextMessage = null;
+}
+
+function contextReply() {
+    if (contextMessage?.id) {
+        setReplyTarget(contextMessage.id);
+    }
+
+    closeMessageContextMenu();
+}
+
+function contextDelete() {
+    if (contextMessage?.id && currentIsAdmin) {
+        deleteMessage(contextMessage.id);
+    }
+
+    closeMessageContextMenu();
+}
+
 function updateTopAdminBadge() {
     const badge = document.getElementById("adminTopBadge");
     if (!badge) return;
@@ -468,6 +528,16 @@ function applyTranslations() {
         usersTitle.textContent = t("onlineUsers");
     }
 
+    const replyBtn = document.getElementById("contextReplyBtn");
+    if (replyBtn) {
+        replyBtn.textContent = t("reply");
+    }
+
+    const deleteBtn = document.getElementById("contextDeleteBtn");
+    if (deleteBtn) {
+        deleteBtn.textContent = t("delete");
+    }
+
     updateLanguageButtons();
     updateChatHeader();
     updateRoomsCount();
@@ -476,6 +546,7 @@ function applyTranslations() {
     toggleChatEmptyState();
     refreshRuntimeTranslations();
     setRoomsListCollapsed(roomsListCollapsed);
+    closeMessageContextMenu();
     renderRooms();
 }
 
@@ -649,6 +720,33 @@ function createMessageNode(payload) {
     const mine = payload.username === currentUser;
     div.className = "msg " + (mine ? "me" : "other");
 
+    div.addEventListener("contextmenu", (event) => {
+        openMessageContextMenu(event, payload);
+    });
+
+    div.addEventListener("touchstart", (event) => {
+        longPressTimer = setTimeout(() => {
+            const touch = event.touches[0];
+
+            openMessageContextMenu(
+                {
+                    preventDefault: () => event.preventDefault(),
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                },
+                payload
+            );
+        }, 550);
+    });
+
+    div.addEventListener("touchend", () => {
+        clearTimeout(longPressTimer);
+    });
+
+    div.addEventListener("touchmove", () => {
+        clearTimeout(longPressTimer);
+    });
+
     const username = document.createElement("div");
     username.className = "msg-username";
     username.textContent = payload.username;
@@ -698,31 +796,6 @@ function createMessageNode(payload) {
     meta.className = "meta";
     meta.innerText = formatTime(payload.timestamp);
     div.appendChild(meta);
-
-    const actions = document.createElement("div");
-    actions.className = "msg-actions";
-
-    if (payload.id) {
-        const replyButton = document.createElement("button");
-        replyButton.className = "secondary small-btn msg-reply-btn";
-        replyButton.textContent = "Reply";
-        replyButton.type = "button";
-        replyButton.addEventListener("click", () => setReplyTarget(payload.id));
-        actions.appendChild(replyButton);
-    }
-
-    if (currentIsAdmin && payload.id) {
-        const deleteButton = document.createElement("button");
-        deleteButton.className = "secondary small-btn msg-delete-btn";
-        deleteButton.textContent = t("delete");
-        deleteButton.type = "button";
-        deleteButton.addEventListener("click", () => deleteMessage(payload.id));
-        actions.appendChild(deleteButton);
-    }
-
-    if (actions.children.length) {
-        div.appendChild(actions);
-    }
 
     return div;
 }
@@ -1574,3 +1647,22 @@ document.addEventListener("visibilitychange", () => {
 initializeSession();
 
 document.getElementById("chat").addEventListener("scroll", handleChatScroll);
+window.addEventListener("scroll", closeMessageContextMenu, true);
+
+document.addEventListener("click", (event) => {
+    const menu = document.getElementById("messageContextMenu");
+
+    if (!menu || menu.classList.contains("hidden")) return;
+
+    if (!menu.contains(event.target)) {
+        closeMessageContextMenu();
+    }
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        closeMessageContextMenu();
+    }
+});
+
+window.addEventListener("resize", closeMessageContextMenu);
