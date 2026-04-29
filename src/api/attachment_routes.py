@@ -120,7 +120,7 @@ async def upload_attachment(
     stored_path = UPLOADS_DIR / stored_name
 
     await asyncio.to_thread(stored_path.write_bytes, content)
-    
+
     if reply_to_id is not None:
         reply_result = await db.execute(
             select(Message).where(

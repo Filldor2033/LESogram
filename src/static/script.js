@@ -84,6 +84,8 @@ const translations = {
         leftRoom: "You left the room",
         systemJoined: "{user} joined",
         systemLeft: "{user} left",
+        typingOne: "{user} is typing",
+        typingMany: "{users} are typing",
         systemRoomDeleted: "Room was deleted by {user}",
         systemRateLimited: "Too many actions. Please slow down.",
         apiMissingToken: "Missing token",
@@ -191,6 +193,8 @@ const translations = {
         leftRoom: "Вы вышли из комнаты",
         systemJoined: "{user} вошёл(а)",
         systemLeft: "{user} вышел(а)",
+        typingOne: "{user} печатает",
+        typingMany: "{users} печатают",
         systemRoomDeleted: "Комната удалена пользователем {user}",
         systemRateLimited: "Слишком много действий. Немного подождите.",
         apiMissingToken: "Токен отсутствует",
@@ -236,6 +240,7 @@ let token = localStorage.getItem("token") || "";
 let currentUser = localStorage.getItem("username") || "";
 let currentRoom = "";
 let currentRoomToken = "";
+
 let ws = null;
 let roomsListCollapsed = false;
 let allRooms = [];
@@ -246,6 +251,11 @@ let currentIsAdmin = localStorage.getItem("is_admin") === "1";
 let replyTarget = null;
 let contextMessage = null;
 let longPressTimer = null;
+
+let typingUsers = new Map();
+let typingStopTimer = null;
+let typingRenderTimer = null;
+
 let messagesNextBeforeId = null;
 let messagesHasMore = true;
 let messagesLoading = false;
@@ -363,6 +373,25 @@ function setInputPlaceholder(id, key) {
     if (el) {
         el.placeholder = t(key);
     }
+}
+
+function sendTypingState(isTyping) {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !currentRoom) return;
+
+    ws.send(JSON.stringify({
+        type: "typing",
+        is_typing: isTyping
+    }));
+}
+
+function handleMessageInputTyping() {
+    sendTypingState(true);
+
+    clearTimeout(typingStopTimer);
+
+    typingStopTimer = setTimeout(() => {
+        sendTypingState(false);
+    }, 1200);
 }
 
 function openMessageContextMenu(event, payload) {
@@ -1110,6 +1139,52 @@ function renderRooms() {
     }
 }
 
+function handleTypingPayload(payload) {
+    const username = payload.username;
+
+    if (!username || username === currentUser) return;
+
+    if (payload.is_typing) {
+        typingUsers.set(username, Date.now() + 2500);
+    } else {
+        typingUsers.delete(username);
+    }
+
+    renderTypingIndicator();
+}
+
+function renderTypingIndicator() {
+    const indicator = document.getElementById("typingIndicator");
+    if (!indicator) return;
+
+    const now = Date.now();
+
+    for (const [username, expiresAt] of typingUsers.entries()) {
+        if (expiresAt <= now) {
+            typingUsers.delete(username);
+        }
+    }
+
+    const users = Array.from(typingUsers.keys());
+
+    if (!users.length) {
+        indicator.classList.add("hidden");
+        indicator.textContent = "";
+        return;
+    }
+
+    indicator.classList.remove("hidden");
+
+    if (users.length === 1) {
+        indicator.textContent = t("typingOne", { user: users[0] });
+    } else {
+        indicator.textContent = t("typingMany", { users: users.join(", ") });
+    }
+
+    clearTimeout(typingRenderTimer);
+    typingRenderTimer = setTimeout(renderTypingIndicator, 1000);
+}
+
 function resetRoomFilters() {
     document.getElementById("roomSearch").value = "";
     document.getElementById("creatorSearch").value = "";
@@ -1280,6 +1355,11 @@ function connectWS() {
 
         if (payload.room && payload.room !== currentRoom) return;
 
+        if (payload.type === "typing") {
+            handleTypingPayload(payload);
+            return;
+        }
+
         if (
             payload.type === "system" &&
             payload.system_event === "room_deleted" &&
@@ -1351,6 +1431,10 @@ function sendMessage() {
         text,
         reply_to_id: replyTarget?.id || null
     }));
+
+    sendTypingState(false);
+    clearTimeout(typingStopTimer);
+
     input.value = "";
     clearReplyTarget();
     setComposerStatus("");
@@ -1516,6 +1600,11 @@ function resetActiveRoomState() {
     if (replyPreview) {
         replyPreview.classList.add("hidden");
     }
+
+    typingUsers.clear();
+    clearTimeout(typingStopTimer);
+    clearTimeout(typingRenderTimer);
+    renderTypingIndicator();
 
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");

@@ -23,11 +23,16 @@ class ConnectionManager:
             if not self.active_connections[room]:
                 del self.active_connections[room]
 
-    async def broadcast_json(self, data: dict, room: str):
+    async def broadcast_json(
+        self,
+        data: dict,
+        room: str,
+        exclude: WebSocket | None = None,
+    ):
         connections = [
             conn
             for conn in self.active_connections.get(room, [])
-            if conn.client_state == WebSocketState.CONNECTED
+            if conn.client_state == WebSocketState.CONNECTED and conn is not exclude
         ]
 
         if not connections:

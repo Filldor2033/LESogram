@@ -82,9 +82,26 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     try:
         while True:
             data = await websocket.receive_json()
+
+            event_type = data.get("type")
+
+            if event_type == "typing":
+                await manager.broadcast_json(
+                    {
+                        "type": "typing",
+                        "room": room,
+                        "username": username,
+                        "is_typing": bool(data.get("is_typing")),
+                        "timestamp": utc_now().isoformat(),
+                    },
+                    room,
+                    exclude=websocket,
+                )
+                continue
+
             text = (data.get("text") or "").strip()
             reply_to_id = data.get("reply_to_id")
-            
+
             if reply_to_id is not None:
                 try:
                     reply_to_id = int(reply_to_id)

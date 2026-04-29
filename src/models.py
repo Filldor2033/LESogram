@@ -52,7 +52,7 @@ class Message(Base):
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    
+
     reply_to_id: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,

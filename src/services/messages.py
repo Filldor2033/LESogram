@@ -34,7 +34,7 @@ def serialize_message(message: Message) -> dict:
         "file_name": message.file_name,
         "mime_type": message.mime_type,
         "file_size": message.file_size,
-        "reply_to_id": message.reply_to_id
+        "reply_to_id": message.reply_to_id,
     }
 
 
@@ -60,7 +60,7 @@ async def save_message(
         file_name=file_name,
         mime_type=mime_type,
         file_size=file_size,
-        reply_to_id=reply_to_id
+        reply_to_id=reply_to_id,
     )
 
     db.add(message)

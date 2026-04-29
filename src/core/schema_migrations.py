@@ -57,7 +57,7 @@ async def ensure_message_schema():
             await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN file_size INTEGER"
             )
-        
+
         if "reply_to_id" not in columns:
             await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN reply_to_id INTEGER"
