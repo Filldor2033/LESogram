@@ -8,6 +8,7 @@ from api.deps import get_current_user, get_db, get_current_user_model
 from auth import create_access_token, hash_password, verify_password
 from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from schemas import CreateRoomRequest, JoinRoomRequest
+from services.permissions import can_delete_room, can_skip_room_password
 from services.rooms import build_system_payload, require_room_access, room_members
 from models import Message, Room, User
 from services.uploads import remove_room_uploads
@@ -91,7 +92,7 @@ async def join_room(
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if not current_user.is_admin:
+    if not can_skip_room_password(current_user):
         if not verify_password(payload.password, room.password_hash):
             raise HTTPException(status_code=403, detail="Wrong room password")
 
@@ -176,7 +177,7 @@ async def delete_room(
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if room.created_by != current_user.username and not current_user.is_admin:
+    if not can_delete_room(current_user, room):
         raise HTTPException(
             status_code=403,
             detail="Only the creator or admin can delete this room",

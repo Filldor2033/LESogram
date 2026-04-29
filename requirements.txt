@@ -6,6 +6,7 @@ python-jose
 pwdlib[argon2]
 python-multipart
 pydantic
+pillow
 
 pytest
 pytest-asyncio

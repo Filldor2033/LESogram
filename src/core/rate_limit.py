@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import HTTPException, Request, WebSocket
 
 from models import User
+from services.permissions import can_skip_rate_limit
 
 
 class SlidingWindowRateLimiter:
@@ -111,7 +112,7 @@ def enforce_http_rate_limit_for_user(
     window_seconds: int,
     user: User,
 ):
-    if user.is_admin:
+    if can_skip_rate_limit(user):
         return
 
     enforce_http_rate_limit(request, bucket, limit, window_seconds)

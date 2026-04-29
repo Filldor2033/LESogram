@@ -3,6 +3,10 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
+from fastapi import HTTPException
+
 from core.config import *
 from models import Message
 
@@ -64,3 +68,14 @@ def remove_room_uploads(messages: list[Message]):
                 candidate.unlink()
             except OSError:
                 pass
+
+
+def validate_image_content(content: bytes) -> None:
+    try:
+        with Image.open(BytesIO(content)) as image:
+            image.verify()
+    except (UnidentifiedImageError, OSError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image file",
+        )

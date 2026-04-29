@@ -17,6 +17,7 @@ from services.uploads import (
     build_attachment_path,
     determine_upload_content_type,
     sanitize_filename,
+    validate_image_content,
 )
 from ws.manager import manager
 
@@ -109,6 +110,9 @@ async def upload_attachment(
             status_code=413,
             detail=f"Attachment is too large. Max size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
         )
+        
+    if content_type == "image":
+        validate_image_content(content)
 
     suffix = Path(safe_filename).suffix[:20]
     stored_name = f"{secrets.token_hex(16)}{suffix}"

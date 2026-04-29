@@ -6,6 +6,7 @@ from api.deps import get_current_user_model, get_db
 from core.rate_limit import enforce_http_rate_limit
 from models import Message, User
 from services.messages import serialize_message
+from services.permissions import can_delete_message
 from services.rooms import require_room_access
 from services.uploads import build_attachment_path
 from utils.time import utc_now
@@ -60,7 +61,7 @@ async def delete_message(
 ):
     enforce_http_rate_limit(request, "delete_message", 60, 60)
 
-    if not current_user.is_admin:
+    if not can_delete_message(current_user):
         raise HTTPException(status_code=403, detail="Only admins can delete messages")
 
     result = await db.execute(select(Message).where(Message.id == message_id))
