@@ -6,12 +6,16 @@ on:
       - "src/**"
       - "requirements.txt"
       - ".github/workflows/**"
+    paths-ignore:
+      - "src/static/**"
 
   pull_request:
     paths:
       - "src/**"
       - "requirements.txt"
       - ".github/workflows/**"
+    paths-ignore:
+      - "src/static/**"
 
 jobs:
   pytest:
