@@ -1,13 +1,16 @@
+import os
+import time
+import asyncio
+import secrets
+import mimetypes
+
+from pathlib import Path
+from threading import Lock
+from typing import Optional
+from urllib.parse import urlparse
 from collections import Counter, defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-import mimetypes
-import os
-from pathlib import Path
-import secrets
-from threading import Lock
-import time
-from urllib.parse import urlparse
 
 from fastapi import (
     Depends,
@@ -114,16 +117,22 @@ def utc_now():
     return datetime.now(timezone.utc)
 
 class SlidingWindowRateLimiter:
-    def __init__(self):
+    def __init__(self, cleanup_interval: int = 60, fallback_window: int = 300):
         self.events: dict[str, deque[float]] = defaultdict(deque)
+        self.key_windows: dict[str, int] = {}
         self.lock = Lock()
+        self.cleanup_interval = cleanup_interval
+        self.fallback_window = fallback_window
+        self._cleanup_task: Optional[asyncio.Task] = None
 
     def hit(self, bucket: str, identifier: str, limit: int, window_seconds: int) -> int | None:
         now = time.monotonic()
         key = f"{bucket}:{identifier}"
 
         with self.lock:
+            self.key_windows[key] = window_seconds
             entries = self.events[key]
+
             while entries and now - entries[0] > window_seconds:
                 entries.popleft()
 
@@ -133,13 +142,41 @@ class SlidingWindowRateLimiter:
 
             entries.append(now)
 
-            if not entries:
-                self.events.pop(key, None)
-
         return None
 
+    async def _cleanup_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(self.cleanup_interval)
+                self._cleanup_expired()
+            except asyncio.CancelledError:
+                break
 
-rate_limiter = SlidingWindowRateLimiter()
+    def _cleanup_expired(self):
+        now = time.monotonic()
+        with self.lock:
+            keys_to_remove = []
+            for key, entries in self.events.items():
+                window = self.key_windows.get(key, self.fallback_window)
+                while entries and now - entries[0] > window:
+                    entries.popleft()
+                if not entries:
+                    keys_to_remove.append(key)
+
+            for key in keys_to_remove:
+                del self.events[key]
+                self.key_windows.pop(key, None)
+
+    def start_cleanup(self):
+        if self._cleanup_task is None or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+    def stop_cleanup(self):
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+
+
+rate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
 
 def ensure_user_schema():
     with engine.begin() as conn:
@@ -205,14 +242,20 @@ def ensure_message_schema():
                 "ALTER TABLE messages ADD COLUMN file_size INTEGER"
             )
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    
     ensure_user_schema()
     ensure_message_schema()
+    
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    rate_limiter.start_cleanup()
+    
     yield
+    
+    rate_limiter.stop_cleanup()
 
 
 app = FastAPI(title="Realtime Chat", lifespan=lifespan)
