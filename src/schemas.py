@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 
 SAFE_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9 _.-]+$")
 
+
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=4, max_length=72)
@@ -14,6 +15,7 @@ class RegisterRequest(BaseModel):
         if not SAFE_NAME_RE.fullmatch(v):
             raise ValueError("Username contains invalid characters")
         return v
+
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
@@ -27,9 +29,11 @@ class LoginRequest(BaseModel):
             raise ValueError("Username contains invalid characters")
         return v
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class CreateRoomRequest(BaseModel):
     name: str = Field(min_length=3, max_length=100)
@@ -48,6 +52,7 @@ class CreateRoomRequest(BaseModel):
 
         return v
 
+
 class JoinRoomRequest(BaseModel):
     room: str = Field(min_length=3, max_length=100)
     password: str = ""
@@ -61,6 +66,7 @@ class JoinRoomRequest(BaseModel):
         if not SAFE_NAME_RE.fullmatch(v):
             raise ValueError("Room name contains invalid characters")
         return v
+
 
 class SendMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)

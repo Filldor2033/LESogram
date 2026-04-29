@@ -10,12 +10,19 @@ sys.path.insert(0, str(SRC_DIR))
 
 import pytest
 from fastapi.testclient import TestClient
-
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
 
 import main
-from database import Base
+import api.deps as deps
+import core.lifespan as lifespan_module
+import services.uploads as uploads_module
+import ws.routes as ws_routes
+
+from models import Base
+from services.rooms import room_members
+from ws.manager import manager
+from core.rate_limit import rate_limiter
 
 
 @pytest.fixture()
@@ -33,8 +40,14 @@ def session_factory():
         autoflush=False,
     )
 
+    async def init_db():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(init_db())
+
     yield TestingSessionLocal, engine
-    
+
     asyncio.run(engine.dispose())
 
 
@@ -49,19 +62,20 @@ def client(session_factory, tmp_path, monkeypatch):
     uploads_dir = tmp_path / "uploads"
     uploads_dir.mkdir()
 
-    monkeypatch.setattr(main, "engine", test_engine)
-    monkeypatch.setattr(main, "SessionLocal", TestingSessionLocal)
-    monkeypatch.setattr(main, "UPLOADS_DIR", uploads_dir)
+    monkeypatch.setattr(lifespan_module, "engine", test_engine)
+    monkeypatch.setattr(uploads_module, "UPLOADS_DIR", uploads_dir)
+    monkeypatch.setattr(ws_routes, "SessionLocal", TestingSessionLocal)
 
-    main.app.dependency_overrides[main.get_db] = override_get_db
-    main.room_members.clear()
-    main.manager.active_connections.clear()
-    main.rate_limiter.events.clear()
+    main.app.dependency_overrides[deps.get_db] = override_get_db
+
+    room_members.clear()
+    manager.active_connections.clear()
+    rate_limiter.events.clear()
 
     with TestClient(main.app) as test_client:
         yield test_client
 
     main.app.dependency_overrides.clear()
-    main.room_members.clear()
-    main.manager.active_connections.clear()
-    main.rate_limiter.events.clear()
+    room_members.clear()
+    manager.active_connections.clear()
+    rate_limiter.events.clear()
