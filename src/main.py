@@ -19,6 +19,7 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     WebSocket,
@@ -913,6 +914,8 @@ async def get_messages(
     room: str,
     room_token: str,
     request: Request,
+    before_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     enforce_http_rate_limit(request, "get_messages", 120, 60)
@@ -921,17 +924,27 @@ async def get_messages(
     if not username:
         raise HTTPException(status_code=403, detail="No access to this room")
 
-    result = await db.execute(
-        select(Message)
-        .where(Message.room == room)
-        .order_by(Message.timestamp.desc())
-        .limit(50)
-    )
+    query = select(Message).where(Message.room == room)
 
+    if before_id is not None:
+        query = query.where(Message.id < before_id)
+
+    query = query.order_by(Message.id.desc()).limit(limit + 1)
+
+    result = await db.execute(query)
     messages = list(result.scalars().all())
+
+    has_more = len(messages) > limit
+    messages = messages[:limit]
     messages.reverse()
 
-    return [serialize_message(message) for message in messages]
+    next_before_id = messages[0].id if messages else None
+
+    return {
+        "messages": [serialize_message(message) for message in messages],
+        "has_more": has_more,
+        "next_before_id": next_before_id,
+    }
 
 
 @app.get("/attachments/{message_id}")

@@ -241,6 +241,9 @@ let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
 let roomsRefreshTimer = null;
 let currentIsAdmin = localStorage.getItem("is_admin") === "1";
+let messagesNextBeforeId = null;
+let messagesHasMore = true;
+let messagesLoading = false;
 
 async function loadMe() {
     const res = await fetch("/me", {
@@ -387,13 +390,14 @@ function renderChatEmptyState() {
         empty = document.createElement("div");
         empty.id = "chatEmptyState";
         empty.className = "chat-empty";
-        chat.appendChild(empty);
     }
 
     empty.innerHTML = `
         <div class="chat-empty-title">${currentRoom ? t("emptyNoMessagesTitle") : t("emptyNoRoomTitle")}</div>
         <div class="chat-empty-text">${currentRoom ? t("emptyNoMessagesText") : t("emptyNoRoomText")}</div>
     `;
+
+    chat.appendChild(empty);
 }
 
 function toggleChatEmptyState() {
@@ -625,8 +629,7 @@ function getSystemMessageText(payload) {
     return payload.text || "";
 }
 
-function addMessage(payload) {
-    const chat = document.getElementById("chat");
+function createMessageNode(payload) {
     const div = document.createElement("div");
 
     if (payload.id) {
@@ -635,18 +638,10 @@ function addMessage(payload) {
 
     if (payload.type === "system") {
         div.className = "msg system";
-        if (payload.system_event) {
-            div.dataset.systemEvent = payload.system_event;
-        }
-        if (payload.system_actor) {
-            div.dataset.systemActor = payload.system_actor;
-        }
+        if (payload.system_event) div.dataset.systemEvent = payload.system_event;
+        if (payload.system_actor) div.dataset.systemActor = payload.system_actor;
         div.innerText = getSystemMessageText(payload);
-
-        chat.appendChild(div);
-        toggleChatEmptyState();
-        scrollChatToBottom();
-        return;
+        return div;
     }
 
     const mine = payload.username === currentUser;
@@ -661,9 +656,7 @@ function addMessage(payload) {
 
     div.appendChild(username);
 
-    if (attachmentNode) {
-        div.appendChild(attachmentNode);
-    }
+    if (attachmentNode) div.appendChild(attachmentNode);
 
     if (hasText) {
         const text = document.createElement("div");
@@ -677,15 +670,12 @@ function addMessage(payload) {
     meta.innerText = formatTime(payload.timestamp);
     div.appendChild(meta);
 
-    if (currentIsAdmin && payload.id) {
-        const deleteButton = document.createElement("button");
-        deleteButton.className = "secondary small-btn msg-delete-btn";
-        deleteButton.textContent = t("delete");
-        deleteButton.type = "button";
-        deleteButton.addEventListener("click", () => deleteMessage(payload.id));
+    return div;
+}
 
-        div.appendChild(deleteButton);
-    }
+function addMessage(payload) {
+    const chat = document.getElementById("chat");
+    const div = createMessageNode(payload);
 
     chat.appendChild(div);
     toggleChatEmptyState();
@@ -1022,9 +1012,14 @@ async function joinRoom(roomName, pwdInput) {
     document.getElementById("leaveChatBtn").classList.remove("hidden");
     document.getElementById("roomUsersBtn").classList.remove("hidden");
 
+    messagesNextBeforeId = null;
+    messagesHasMore = true;
+    messagesLoading = false;
+
     clearChat();
-    connectWS();
     await loadMessages();
+    connectWS();
+
     setRoomsListCollapsed(true);
     setStatus("roomStatus", t("joinedRoom", { room: roomName }));
     setComposerStatus("");
@@ -1032,19 +1027,60 @@ async function joinRoom(roomName, pwdInput) {
     await loadRooms();
 }
 
-async function loadMessages() {
-    const res = await fetch(
-        `/messages/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`
-    );
-    const data = await safeJson(res);
+async function loadMessages({ older = false } = {}) {
+    if (messagesLoading) return;
 
-    if (!res.ok) {
-        setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadMessages"), true);
-        return;
-    }
+    messagesLoading = true;
 
-    for (const message of data) {
-        addMessage(message);
+    const chat = document.getElementById("chat");
+    const oldScrollHeight = chat.scrollHeight;
+    const oldScrollTop = chat.scrollTop;
+
+    try {
+        let url = `/messages/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`;
+
+        if (older && messagesNextBeforeId) {
+            url += `&before_id=${encodeURIComponent(messagesNextBeforeId)}`;
+        }
+
+        const res = await fetch(url);
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadMessages"), true);
+            return;
+        }
+
+        const messages = data.messages || [];
+
+        messagesNextBeforeId = data.next_before_id;
+        messagesHasMore = Boolean(data.has_more);
+
+        if (older) {
+            const fragment = document.createDocumentFragment();
+
+            for (const message of messages) {
+                fragment.appendChild(createMessageNode(message));
+            }
+
+            chat.insertBefore(fragment, chat.firstChild);
+            toggleChatEmptyState();
+        } else {
+            for (const message of messages) {
+                addMessage(message);
+            }
+        }
+
+        if (older) {
+            const newScrollHeight = chat.scrollHeight;
+            chat.scrollTop = newScrollHeight - oldScrollHeight + oldScrollTop;
+        } else {
+            scrollChatToBottom();
+        }
+    } catch {
+        setStatus("roomStatus", t("cannotLoadMessages"), true);
+    } finally {
+        messagesLoading = false;
     }
 }
 
@@ -1402,6 +1438,21 @@ async function initializeSession() {
     startRoomsAutoRefresh();
 }
 
+function handleChatScroll() {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    if (
+        currentRoom &&
+        currentRoomToken &&
+        messagesHasMore &&
+        !messagesLoading &&
+        chat.scrollTop < 80
+    ) {
+        loadMessages({ older: true });
+    }
+}
+
 document.addEventListener("visibilitychange", () => {
     if (!document.hidden && token) {
         loadRooms();
@@ -1409,3 +1460,5 @@ document.addEventListener("visibilitychange", () => {
 });
 
 initializeSession();
+
+document.getElementById("chat").addEventListener("scroll", handleChatScroll);
