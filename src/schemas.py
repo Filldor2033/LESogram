@@ -70,3 +70,7 @@ class JoinRoomRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
+
+
+class EditMessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)

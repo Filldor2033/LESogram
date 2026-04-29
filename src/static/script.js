@@ -5,6 +5,12 @@ const translations = {
         noOnlineUsers: "No users online",
         reply: "Reply",
         close: "Close",
+        edit: "Edit",
+        save: "Save",
+        cancel: "Cancel",
+        edited: "edited",
+        cannotEditMessage: "Cannot edit message",
+        onlyAuthorCanEdit: "Only the author can edit this message",
         appTitle: "LESogram",
         brandSubtitle: "Fast rooms, live messages, simple sharing",
         authTitle: "Account",
@@ -113,6 +119,12 @@ const translations = {
         noOnlineUsers: "Нет пользователей онлайн",
         reply: "Ответить",
         close: "Закрыть",
+        edit: "Редактировать",
+        save: "Сохранить",
+        cancel: "Отмена",
+        edited: "изменено",
+        cannotEditMessage: "Не удалось изменить сообщение",
+        onlyAuthorCanEdit: "Редактировать сообщение может только автор",
         appTitle: "LESogram",
         brandSubtitle: "Быстрые комнаты, живые сообщения и удобная отправка файлов",
         authTitle: "Аккаунт",
@@ -233,7 +245,8 @@ const API_DETAIL_MAP = {
     "File type is not allowed": "apiFileTypeNotAllowed",
     "GIF uploads are disabled": "apiGifDisabled",
     "Attachment is empty": "apiAttachmentEmpty",
-    "Message cannot be empty": "apiMessageEmpty"
+    "Message cannot be empty": "apiMessageEmpty",
+    "Only the author can edit this message": "onlyAuthorCanEdit",
 };
 
 let token = localStorage.getItem("token") || "";
@@ -394,6 +407,101 @@ function handleMessageInputTyping() {
     }, 1200);
 }
 
+function contextEdit() {
+    if (contextMessage?.id) {
+        startEditingMessage(contextMessage.id);
+    }
+
+    closeMessageContextMenu();
+}
+
+function startEditingMessage(messageId) {
+    const node = document.querySelector(`.msg[data-message-id="${messageId}"]`);
+    const payload = messageCache.get(Number(messageId));
+
+    if (!node || !payload) return;
+
+    const textNode = node.querySelector(".msg-text");
+    if (!textNode) return;
+
+    const oldText = payload.text || "";
+
+    const editor = document.createElement("div");
+    editor.className = "msg-editor";
+
+    const input = document.createElement("textarea");
+    input.className = "msg-editor-input";
+    input.value = oldText;
+
+    const actions = document.createElement("div");
+    actions.className = "msg-editor-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "small-btn";
+    saveBtn.type = "button";
+    saveBtn.textContent = t("save");
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "secondary small-btn";
+    cancelBtn.type = "button";
+    cancelBtn.textContent = t("cancel");
+
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+
+    editor.appendChild(input);
+    editor.appendChild(actions);
+
+    textNode.replaceWith(editor);
+    input.focus();
+
+    cancelBtn.addEventListener("click", () => {
+        editor.replaceWith(textNode);
+    });
+
+    saveBtn.addEventListener("click", async () => {
+        await submitEditMessage(messageId, input.value);
+    });
+}
+
+async function submitEditMessage(messageId, text) {
+    const cleanText = text.trim();
+
+    if (!cleanText) {
+        setComposerStatus(t("apiMessageEmpty"), true);
+        return;
+    }
+
+    const res = await fetch(`/messages/${encodeURIComponent(messageId)}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ text: cleanText })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        setComposerStatus(getApiErrorMessage(data, "cannotEditMessage"), true);
+        return;
+    }
+
+    if (data.message) {
+        updateMessageInChat(data.message);
+    }
+}
+
+function updateMessageInChat(payload) {
+    if (payload.id) {
+        messageCache.set(Number(payload.id), payload);
+    }
+
+    const oldNode = document.querySelector(`.msg[data-message-id="${payload.id}"]`);
+    if (!oldNode) return;
+
+    const newNode = createMessageNode(payload);
+    oldNode.replaceWith(newNode);
+}
+
 function openMessageContextMenu(event, payload) {
     event.preventDefault();
 
@@ -401,6 +509,12 @@ function openMessageContextMenu(event, payload) {
 
     const menu = document.getElementById("messageContextMenu");
     const deleteBtn = document.getElementById("contextDeleteBtn");
+    const editBtn = document.getElementById("contextEditBtn");
+
+    editBtn.classList.toggle(
+        "hidden",
+        !(payload.id && payload.username === currentUser && payload.content_type === "text")
+    );
 
     deleteBtn.classList.toggle("hidden", !(currentIsAdmin && payload.id));
 
@@ -533,6 +647,10 @@ function applyTranslations() {
     setButtonText("pickMediaBtn", "pickMedia");
     setButtonText("pickFileBtn", "pickFile");
     setButtonText("sendBtn", "send");
+    setButtonText("contextReplyBtn", "reply");
+    setButtonText("contextEditBtn", "edit");
+    setButtonText("contextDeleteBtn", "delete");
+    setButtonText("roomUsersBtn", "users");
 
     setInputPlaceholder("username", "usernamePlaceholder");
     setInputPlaceholder("password", "passwordPlaceholder");
@@ -550,22 +668,6 @@ function applyTranslations() {
     document.getElementById("sortOnlineDesc").textContent = t("sortOnlineDesc");
     document.getElementById("sortOnlineAsc").textContent = t("sortOnlineAsc");
     document.getElementById("sortCreatorAsc").textContent = t("sortCreatorAsc");
-
-    setButtonText("roomUsersBtn", "users");
-    const usersTitle = document.getElementById("usersPopupTitle");
-    if (usersTitle) {
-        usersTitle.textContent = t("onlineUsers");
-    }
-
-    const replyBtn = document.getElementById("contextReplyBtn");
-    if (replyBtn) {
-        replyBtn.textContent = t("reply");
-    }
-
-    const deleteBtn = document.getElementById("contextDeleteBtn");
-    if (deleteBtn) {
-        deleteBtn.textContent = t("delete");
-    }
 
     updateLanguageButtons();
     updateChatHeader();
@@ -823,7 +925,9 @@ function createMessageNode(payload) {
 
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.innerText = formatTime(payload.timestamp);
+    meta.innerText = payload.is_edited
+        ? `${formatTime(payload.timestamp)} · ${t("edited")}`
+        : formatTime(payload.timestamp);
     div.appendChild(meta);
 
     return div;
@@ -1355,17 +1459,22 @@ function connectWS() {
 
         if (payload.room && payload.room !== currentRoom) return;
 
-        if (payload.type === "typing") {
-            handleTypingPayload(payload);
-            return;
-        }
-
         if (
             payload.type === "system" &&
             payload.system_event === "room_deleted" &&
             payload.room === currentRoom
         ) {
             handleRoomDeleted(payload);
+            return;
+        }
+
+        if (payload.type === "typing") {
+            handleTypingPayload(payload);
+            return;
+        }
+
+        if (payload.type === "message_edited") {
+            updateMessageInChat(payload.message);
             return;
         }
 

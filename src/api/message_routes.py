@@ -3,9 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user_model, get_db
-from core.rate_limit import enforce_http_rate_limit
+from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from models import Message, User
-from services.messages import serialize_message
+from schemas import EditMessageRequest
+from services.messages import normalize_message_text, serialize_message
 from services.permissions import can_delete_message
 from services.rooms import require_room_access
 from services.uploads import build_attachment_path
@@ -98,3 +99,53 @@ async def delete_message(
         "status": "deleted",
         "message_id": deleted_message_id,
     }
+
+
+@router.patch("/messages/{message_id}")
+async def edit_message(
+    message_id: int,
+    payload: EditMessageRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_model),
+):
+    enforce_http_rate_limit_for_user(
+        request,
+        "edit_message",
+        60,
+        60,
+        current_user,
+    )
+
+    new_text = normalize_message_text(payload.text, allow_empty=False)
+
+    result = await db.execute(
+        select(Message).where(Message.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message.username != current_user.username:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the author can edit this message",
+        )
+
+    message.text = new_text
+    message.edited_at = utc_now()
+
+    await db.commit()
+    await db.refresh(message)
+
+    payload_data = {
+        "type": "message_edited",
+        "room": message.room,
+        "message": serialize_message(message),
+        "timestamp": utc_now().isoformat(),
+    }
+
+    await manager.broadcast_json(payload_data, message.room)
+
+    return payload_data

@@ -57,5 +57,10 @@ class Message(Base):
         Integer,
         nullable=True,
     )
+    
+    edited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     __table_args__ = (Index("ix_messages_room_id", "room", "id"),)

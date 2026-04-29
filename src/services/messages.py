@@ -35,6 +35,8 @@ def serialize_message(message: Message) -> dict:
         "mime_type": message.mime_type,
         "file_size": message.file_size,
         "reply_to_id": message.reply_to_id,
+        "edited_at": message.edited_at.isoformat() if message.edited_at else None,
+        "is_edited": message.edited_at is not None,
     }
 
 

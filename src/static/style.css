@@ -186,6 +186,38 @@ select {
     }
 }
 
+.msg-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.msg-editor-input {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(2, 6, 23, 0.22);
+    color: inherit;
+    padding: 10px;
+    font: inherit;
+}
+
+.msg-editor-input:focus {
+    outline: none;
+    border-color: var(--accent-line);
+}
+
+.msg-editor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.msg-editor-actions button {
+    width: auto;
+}
+
 .context-menu {
     position: fixed;
     z-index: 9999;
