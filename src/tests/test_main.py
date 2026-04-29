@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
+from fastapi.websockets import WebSocketState
 import pytest
 from fastapi import HTTPException
 from jose import jwt
@@ -113,9 +114,11 @@ async def test_connection_manager_broadcast_with_dead_connections():
     manager = main.ConnectionManager()
     
     ws_good = Mock()
+    ws_good.client_state = WebSocketState.CONNECTED
     ws_good.send_json = AsyncMock()
     
     ws_dead = Mock()
+    ws_dead.client_state = WebSocketState.CONNECTED
     ws_dead.send_json = AsyncMock(side_effect=ConnectionError("dead"))
     
     room = "test_room"
@@ -316,9 +319,11 @@ async def test_connection_manager_broadcast_removes_dead():
     manager = main.ConnectionManager()
     
     ws_alive = Mock()
+    ws_alive.client_state = WebSocketState.CONNECTED
     ws_alive.send_json = AsyncMock()
     
     ws_dead = Mock()
+    ws_dead.client_state = WebSocketState.CONNECTED
     ws_dead.send_json = AsyncMock(side_effect=RuntimeError("Connection lost"))
     
     room = "test"

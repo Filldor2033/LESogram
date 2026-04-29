@@ -381,8 +381,8 @@ class ConnectionManager:
     async def _send_and_track(self, websocket: WebSocket, data: dict, room: str, dead_list: list):
         try:
             await asyncio.wait_for(websocket.send_json(data), timeout=5.0)
-        except (WebSocketDisconnect, ConnectionResetError, asyncio.TimeoutError, OSError):
-            dead_list.append(websocket)  # Локальный список — потокобезопасен в рамках TaskGroup
+        except (WebSocketDisconnect, ConnectionResetError, asyncio.TimeoutError, OSError, RuntimeError):
+            dead_list.append(websocket)
 
     async def close_room(self, room: str, code: int = 1008):
         connections = list(self.active_connections.get(room, []))
