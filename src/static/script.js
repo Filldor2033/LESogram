@@ -449,11 +449,13 @@ function startEditingMessage(messageId) {
     const saveBtn = document.createElement("button");
     saveBtn.className = "small-btn";
     saveBtn.type = "button";
+    saveBtn.dataset.i18nKey = "save";
     saveBtn.textContent = t("save");
 
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "secondary small-btn";
     cancelBtn.type = "button";
+    cancelBtn.dataset.i18nKey = "cancel";
     cancelBtn.textContent = t("cancel");
 
     actions.appendChild(saveBtn);
@@ -662,6 +664,10 @@ function applyTranslations() {
     setButtonText("contextDeleteBtn", "delete");
     setButtonText("roomUsersBtn", "users");
     setButtonText("notificationsBtn", "enableNotifications");
+
+    document.querySelectorAll("[data-i18n-key]").forEach((node) => {
+        node.textContent = t(node.dataset.i18nKey);
+    });
 
     setInputPlaceholder("username", "usernamePlaceholder");
     setInputPlaceholder("password", "passwordPlaceholder");
