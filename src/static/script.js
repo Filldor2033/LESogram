@@ -903,21 +903,29 @@ async function toggleNotifications() {
     }
 }
 
+function notificationAllowed() {
+    if (!notificationsEnabled) return false;
+    if (!("Notification" in window)) return false;
+    if (Notification.permission !== "granted") return false;
+
+    const isPageVisible = !document.hidden;
+    if (isPageVisible) return false;
+
+    return true;
+}
+
 function showNotification(title, body) {
-    if (Notification.permission === "granted") {
+    if (notificationAllowed()) {
         new Notification(title, { body });
     }
 }
 
 function maybeNotify(payload) {
-    if (!notificationsEnabled) return;
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
-    if (!payload || payload.type !== "message") return;
-    if (payload.username === currentUser) return;
+    if (!notificationAllowed())
+        return;
 
-    const isPageVisible = !document.hidden;
-    if (isPageVisible) return;
+    if (!payload || payload.type !== "message") return false;
+    if (payload.username === currentUser) return false;
 
     const body = payload.text || payload.file_name || t("attachmentLabel");
 
