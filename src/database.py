@@ -1,17 +1,18 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import declarative_base
 
-DATABASE_URL = "sqlite:///./chat.db"
+DATABASE_URL = "sqlite+aiosqlite:///./chat.db"
 
-engine = create_engine(
+engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False}
+    echo=False,
 )
 
-SessionLocal = sessionmaker(
-    autocommit=False,
+SessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
     autoflush=False,
-    bind=engine
 )
 
 Base = declarative_base()

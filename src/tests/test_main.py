@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -7,6 +8,7 @@ from fastapi.websockets import WebSocketState
 import pytest
 from fastapi import HTTPException
 from jose import jwt
+from sqlalchemy import select
 
 from auth import SECRET_KEY, ALGORITHM
 import main
@@ -421,15 +423,21 @@ def create_room_and_join(client, headers, room="general", password="roompass"):
 
 def make_admin(session_factory, username="testuser"):
     TestingSessionLocal, _ = session_factory
-    db = TestingSessionLocal()
-    try:
-        from models import User
-        user = db.query(User).filter(User.username == username).first()
-        if user:
-            user.is_admin = True
-            db.commit()
-    finally:
-        db.close()
+
+    async def _make_admin():
+        async with TestingSessionLocal() as db:
+            from models import User
+
+            result = await db.execute(
+                select(User).where(User.username == username)
+            )
+            user = result.scalar_one_or_none()
+
+            if user:
+                user.is_admin = True
+                await db.commit()
+
+    asyncio.run(_make_admin())
 
 try:
     from unittest.mock import AsyncMock

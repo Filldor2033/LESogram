@@ -28,7 +28,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.websockets import WebSocketState
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import ALGORITHM, SECRET_KEY, create_access_token, hash_password, verify_password, verify_token
 from database import SessionLocal, engine
@@ -179,84 +180,76 @@ class SlidingWindowRateLimiter:
 
 rate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
 
-def ensure_user_schema():
-    with engine.begin() as conn:
-        tables = {
-            row[0]
-            for row in conn.exec_driver_sql(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+async def ensure_user_schema():
+    async with engine.begin() as conn:
+        result = await conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+        tables = {row[0] for row in result.fetchall()}
 
         if "users" not in tables:
             return
 
-        columns = {
-            row["name"]
-            for row in conn.exec_driver_sql("PRAGMA table_info(users)").mappings().all()
-        }
+        result = await conn.exec_driver_sql("PRAGMA table_info(users)")
+        columns = {row["name"] for row in result.mappings().all()}
 
         if "is_admin" not in columns:
-            conn.exec_driver_sql(
+            await conn.exec_driver_sql(
                 "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"
             )
 
-def ensure_message_schema():
-    with engine.begin() as conn:
-        tables = {
-            row[0]
-            for row in conn.exec_driver_sql(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+async def ensure_message_schema():
+    async with engine.begin() as conn:
+        result = await conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+        tables = {row[0] for row in result.fetchall()}
 
         if "messages" not in tables:
             return
 
-        columns = {
-            row["name"]
-            for row in conn.exec_driver_sql("PRAGMA table_info(messages)").mappings().all()
-        }
+        result = await conn.exec_driver_sql("PRAGMA table_info(messages)")
+        columns = {row["name"] for row in result.mappings().all()}
 
         if "content_type" not in columns:
-            conn.exec_driver_sql(
+            await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN content_type VARCHAR(20) NOT NULL DEFAULT 'text'"
             )
 
         if "media_url" not in columns:
-            conn.exec_driver_sql(
+            await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN media_url VARCHAR(500)"
             )
 
         if "file_name" not in columns:
-            conn.exec_driver_sql(
+            await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN file_name VARCHAR(255)"
             )
 
         if "mime_type" not in columns:
-            conn.exec_driver_sql(
+            await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN mime_type VARCHAR(255)"
             )
 
         if "file_size" not in columns:
-            conn.exec_driver_sql(
+            await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN file_size INTEGER"
             )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    
-    ensure_user_schema()
-    ensure_message_schema()
-    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    await ensure_user_schema()
+    await ensure_message_schema()
+
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    
     rate_limiter.start_cleanup()
-    
+
     yield
-    
+
     rate_limiter.stop_cleanup()
 
 
@@ -296,12 +289,9 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-def get_db():
-    db = SessionLocal()
-    try:
+async def get_db():
+    async with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> str:
@@ -314,11 +304,15 @@ def get_current_user(authorization: str | None = Header(default=None)) -> str:
         raise HTTPException(status_code=401, detail="Invalid token")
     return username
 
-def get_current_user_model(
+
+async def get_current_user_model(
     username: str = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    user = db.query(User).filter(User.username == username).first()
+    result = await db.execute(
+        select(User).where(User.username == username)
+    )
+    user = result.scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -516,8 +510,8 @@ def remove_room_uploads(messages: list[Message]):
                 pass
 
 
-def save_message(
-    db: Session,
+async def save_message(
+    db: AsyncSession,
     *,
     username: str,
     room: str,
@@ -538,9 +532,10 @@ def save_message(
         mime_type=mime_type,
         file_size=file_size,
     )
+
     db.add(message)
-    db.commit()
-    db.refresh(message)
+    await db.commit()
+    await db.refresh(message)
     return message
 
 
@@ -556,7 +551,7 @@ def websocket_origin_allowed(websocket: WebSocket) -> bool:
     return origin_host == host.lower()
 
 @app.get("/me")
-def get_me(
+async def get_me(
     current_user: User = Depends(get_current_user_model),
 ):
     return {
@@ -564,38 +559,52 @@ def get_me(
         "is_admin": bool(current_user.is_admin),
     }
 
+
 @app.post("/register")
-def register(
+async def register(
     payload: RegisterRequest,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     enforce_http_rate_limit(request, "register", 8, 60)
 
-    existing = db.query(User).filter(User.username == payload.username).first()
+    username = payload.username.strip()
+
+    result = await db.execute(
+        select(User).where(User.username == username)
+    )
+    existing = result.scalar_one_or_none()
+
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
 
     user = User(
-        username=payload.username.strip(),
+        username=username,
         hashed_password=hash_password(payload.password),
     )
+
     db.add(user)
-    db.commit()
+    await db.commit()
+    await db.refresh(user)
 
     token = create_access_token({"sub": user.username})
     return TokenResponse(access_token=token)
 
 
 @app.post("/login")
-def login(
+async def login(
     payload: LoginRequest,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     enforce_http_rate_limit(request, "login", 10, 60)
 
-    user = db.query(User).filter(User.username == payload.username.strip()).first()
+    username = payload.username.strip()
+
+    result = await db.execute(
+        select(User).where(User.username == username)
+    )
+    user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
@@ -605,37 +614,46 @@ def login(
 
 
 @app.get("/rooms")
-def list_rooms(
+async def list_rooms(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     username: str = Depends(get_current_user),
 ):
     del username
     enforce_http_rate_limit(request, "list_rooms", 120, 60)
 
-    rooms = db.query(Room).order_by(Room.created_at.desc()).all()
-    result = []
-    for room in rooms:
-        result.append({
+    result = await db.execute(
+        select(Room).order_by(Room.created_at.desc())
+    )
+    rooms = result.scalars().all()
+
+    return [
+        {
             "name": room.name,
             "created_by": room.created_by,
             "created_at": room.created_at.isoformat(),
             "online": len(room_members.get(room.name, {})),
-        })
-    return result
+        }
+        for room in rooms
+    ]
 
 
 @app.post("/rooms")
-def create_room(
+async def create_room(
     payload: CreateRoomRequest,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     username: str = Depends(get_current_user),
 ):
     enforce_http_rate_limit(request, "create_room", 20, 300)
 
     room_name = payload.name.strip()
-    existing = db.query(Room).filter(Room.name == room_name).first()
+
+    result = await db.execute(
+        select(Room).where(Room.name == room_name)
+    )
+    existing = result.scalar_one_or_none()
+
     if existing:
         raise HTTPException(status_code=400, detail="Room already exists")
 
@@ -644,17 +662,19 @@ def create_room(
         password_hash=hash_password(payload.password),
         created_by=username,
     )
+
     db.add(room)
-    db.commit()
+    await db.commit()
 
     return {"status": "created", "room": room_name}
 
+
 @app.get("/rooms/{room}/users")
-def list_room_users(
+async def list_room_users(
     room: str,
     room_token: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     enforce_http_rate_limit(request, "list_room_users", 120, 60)
 
@@ -662,7 +682,11 @@ def list_room_users(
     if not username:
         raise HTTPException(status_code=403, detail="No access to this room")
 
-    existing_room = db.query(Room).filter(Room.name == room).first()
+    result = await db.execute(
+        select(Room).where(Room.name == room)
+    )
+    existing_room = result.scalar_one_or_none()
+
     if not existing_room:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -671,11 +695,11 @@ def list_room_users(
     admin_map = {}
 
     if usernames:
-        rows = (
-            db.query(User.username, User.is_admin)
-            .filter(User.username.in_(usernames))
-            .all()
+        result = await db.execute(
+            select(User.username, User.is_admin)
+            .where(User.username.in_(usernames))
         )
+        rows = result.all()
 
         admin_map = {
             row.username: bool(row.is_admin)
@@ -696,32 +720,47 @@ def list_room_users(
         "users": users,
     }
 
+
 @app.delete("/rooms/{room_name}")
 async def delete_room(
     room_name: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
     enforce_http_rate_limit(request, "delete_room", 10, 300)
 
-    room = db.query(Room).filter(Room.name == room_name).first()
+    result = await db.execute(
+        select(Room).where(Room.name == room_name)
+    )
+    room = result.scalar_one_or_none()
+
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
     if room.created_by != current_user.username and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Only the creator or admin can delete this room")
+        raise HTTPException(
+            status_code=403,
+            detail="Only the creator or admin can delete this room",
+        )
 
-    messages = db.query(Message).filter(Message.room == room_name).all()
+    result = await db.execute(
+        select(Message).where(Message.room == room_name)
+    )
+    messages = list(result.scalars().all())
+
     remove_room_uploads(messages)
 
-    db.query(Message).filter(Message.room == room_name).delete(synchronize_session=False)
-    db.delete(room)
-    db.commit()
+    await db.execute(
+        delete(Message).where(Message.room == room_name)
+    )
+
+    await db.delete(room)
+    await db.commit()
 
     await manager.broadcast_json(
         build_system_payload(room_name, current_user.username, "room_deleted"),
-        room_name
+        room_name,
     )
 
     room_members.pop(room_name, None)
@@ -729,11 +768,12 @@ async def delete_room(
 
     return {"status": "deleted", "room": room_name}
 
+
 @app.delete("/messages/{message_id}")
 async def delete_message(
     message_id: int,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
     enforce_http_rate_limit(request, "delete_message", 60, 60)
@@ -741,7 +781,10 @@ async def delete_message(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can delete messages")
 
-    message = db.query(Message).filter(Message.id == message_id).first()
+    result = await db.execute(
+        select(Message).where(Message.id == message_id)
+    )
+    message = result.scalar_one_or_none()
 
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -756,8 +799,8 @@ async def delete_message(
         except OSError:
             pass
 
-    db.delete(message)
-    db.commit()
+    await db.delete(message)
+    await db.commit()
 
     await manager.broadcast_json(
         {
@@ -775,17 +818,22 @@ async def delete_message(
         "message_id": deleted_message_id,
     }
 
+
 @app.post("/rooms/join")
-def join_room(
+async def join_room(
     payload: JoinRoomRequest,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
     enforce_http_rate_limit(request, "join_room", 30, 300)
 
     room_name = payload.room.strip()
-    room = db.query(Room).filter(Room.name == room_name).first()
+
+    result = await db.execute(
+        select(Room).where(Room.name == room_name)
+    )
+    room = result.scalar_one_or_none()
 
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -808,11 +856,11 @@ def join_room(
 
 
 @app.get("/messages/{room}")
-def get_messages(
+async def get_messages(
     room: str,
     room_token: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     enforce_http_rate_limit(request, "get_messages", 120, 60)
 
@@ -820,28 +868,33 @@ def get_messages(
     if not username:
         raise HTTPException(status_code=403, detail="No access to this room")
 
-    messages = (
-        db.query(Message)
-        .filter(Message.room == room)
+    result = await db.execute(
+        select(Message)
+        .where(Message.room == room)
         .order_by(Message.timestamp.desc())
         .limit(50)
-        .all()
     )
 
+    messages = list(result.scalars().all())
     messages.reverse()
+
     return [serialize_message(message) for message in messages]
 
 
 @app.get("/attachments/{message_id}")
-def get_attachment(
+async def get_attachment(
     message_id: int,
     room_token: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     enforce_http_rate_limit(request, "get_attachment", 240, 60)
 
-    message = db.query(Message).filter(Message.id == message_id).first()
+    result = await db.execute(
+        select(Message).where(Message.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+
     if not message or not message.media_url:
         raise HTTPException(status_code=404, detail="Attachment not found")
 
@@ -854,14 +907,17 @@ def get_attachment(
         raise HTTPException(status_code=404, detail="Attachment not found")
 
     disposition = "inline" if message.content_type in {"image", "video"} else "attachment"
+
     response = FileResponse(
         file_path,
         media_type=message.mime_type or "application/octet-stream",
         filename=message.file_name or file_path.name,
         content_disposition_type=disposition,
     )
+
     response.headers["Cache-Control"] = "private, no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
+
     return response
 
 
@@ -872,7 +928,7 @@ async def upload_attachment(
     room_token: str = Form(...),
     text: str = Form(default=""),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
     enforce_http_rate_limit(request, "upload_attachment", 20, 300)
@@ -886,7 +942,13 @@ async def upload_attachment(
 
     caption = normalize_message_text(text, allow_empty=True)
     safe_filename = sanitize_filename(file.filename)
-    mime_type = (file.content_type or mimetypes.guess_type(safe_filename)[0] or "application/octet-stream").lower()
+
+    mime_type = (
+        file.content_type
+        or mimetypes.guess_type(safe_filename)[0]
+        or "application/octet-stream"
+    ).lower()
+
     content_type = determine_upload_content_type(safe_filename, mime_type)
 
     content = await file.read(MAX_UPLOAD_SIZE + 1)
@@ -904,9 +966,10 @@ async def upload_attachment(
     suffix = Path(safe_filename).suffix[:20]
     stored_name = f"{secrets.token_hex(16)}{suffix}"
     stored_path = UPLOADS_DIR / stored_name
+
     stored_path.write_bytes(content)
 
-    message = save_message(
+    message = await save_message(
         db,
         username=username,
         room=room,
@@ -920,6 +983,7 @@ async def upload_attachment(
 
     payload = serialize_message(message)
     await manager.broadcast_json(payload, room)
+
     return payload
 
 
@@ -969,17 +1033,14 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                 })
                 continue
 
-            db = SessionLocal()
-            try:
-                message = save_message(
+            async with SessionLocal() as db:
+                message = await save_message(
                     db,
                     username=username,
                     room=room,
                     text=text,
                     content_type="text",
                 )
-            finally:
-                db.close()
 
             await manager.broadcast_json(serialize_message(message), room)
 
@@ -1003,5 +1064,5 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
 
 
 @app.get("/")
-def get_index():
+async def get_index():
     return HTMLResponse((STATIC_DIR / "index.html").read_text(encoding="utf-8"))

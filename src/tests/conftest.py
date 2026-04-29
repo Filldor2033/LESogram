@@ -9,8 +9,8 @@ sys.path.insert(0, str(SRC_DIR))
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
 
 import main
@@ -19,36 +19,29 @@ from database import Base
 
 @pytest.fixture()
 def session_factory():
-    engine = create_engine(
-        "sqlite://",
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
 
-    TestingSessionLocal = sessionmaker(
-        autocommit=False,
-        autoflush=False,
+    TestingSessionLocal = async_sessionmaker(
         bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
     )
 
-    Base.metadata.create_all(bind=engine)
-
     yield TestingSessionLocal, engine
-
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
 
 
 @pytest.fixture()
 def client(session_factory, tmp_path, monkeypatch):
     TestingSessionLocal, test_engine = session_factory
 
-    def override_get_db():
-        db = TestingSessionLocal()
-        try:
+    async def override_get_db():
+        async with TestingSessionLocal() as db:
             yield db
-        finally:
-            db.close()
 
     uploads_dir = tmp_path / "uploads"
     uploads_dir.mkdir()

@@ -1,3 +1,6 @@
+import asyncio
+
+from sqlalchemy import select
 from starlette.websockets import WebSocketDisconnect
 
 from auth import hash_password
@@ -191,16 +194,18 @@ def test_websocket_send_message_and_history(client):
 def make_admin(session_factory, username: str):
     TestingSessionLocal, _ = session_factory
 
-    db = TestingSessionLocal()
-    try:
-        user = db.query(User).filter(User.username == username).first()
-        assert user is not None
+    async def _make_admin():
+        async with TestingSessionLocal() as db:
+            result = await db.execute(
+                select(User).where(User.username == username)
+            )
+            user = result.scalar_one_or_none()
+            assert user is not None
 
-        user.is_admin = True
-        db.commit()
-    finally:
-        db.close()
+            user.is_admin = True
+            await db.commit()
 
+    asyncio.run(_make_admin())
 
 def test_only_admin_can_delete_message(client, session_factory):
     alice_headers = register(client, "alice", "secret123")
