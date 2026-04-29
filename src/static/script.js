@@ -241,9 +241,11 @@ let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
 let roomsRefreshTimer = null;
 let currentIsAdmin = localStorage.getItem("is_admin") === "1";
+let replyTarget = null;
 let messagesNextBeforeId = null;
 let messagesHasMore = true;
 let messagesLoading = false;
+const messageCache = new Map();
 
 async function loadMe() {
     const res = await fetch("/me", {
@@ -651,6 +653,33 @@ function createMessageNode(payload) {
     username.className = "msg-username";
     username.textContent = payload.username;
 
+    if (payload.reply_to_id) {
+        const replied = messageCache.get(Number(payload.reply_to_id));
+
+        const replyBox = document.createElement("div");
+        replyBox.className = "msg-reply";
+
+        const replyAuthor = document.createElement("div");
+        replyAuthor.className = "msg-reply-author";
+        replyAuthor.textContent = replied?.username || "Reply";
+
+        const replyText = document.createElement("div");
+        replyText.className = "msg-reply-text";
+        replyText.textContent = replied ? getReplyTextPreview(replied) : `#${payload.reply_to_id}`;
+
+        replyBox.appendChild(replyAuthor);
+        replyBox.appendChild(replyText);
+
+        replyBox.addEventListener("click", () => {
+            const target = document.querySelector(`.msg[data-message-id="${payload.reply_to_id}"]`);
+            if (target) {
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        });
+
+        div.appendChild(replyBox);
+    }
+
     const attachmentNode = buildAttachmentNode(payload);
     const hasText = Boolean((payload.text || "").trim());
 
@@ -670,13 +699,29 @@ function createMessageNode(payload) {
     meta.innerText = formatTime(payload.timestamp);
     div.appendChild(meta);
 
+    const actions = document.createElement("div");
+    actions.className = "msg-actions";
+
+    if (payload.id) {
+        const replyButton = document.createElement("button");
+        replyButton.className = "secondary small-btn msg-reply-btn";
+        replyButton.textContent = "Reply";
+        replyButton.type = "button";
+        replyButton.addEventListener("click", () => setReplyTarget(payload.id));
+        actions.appendChild(replyButton);
+    }
+
     if (currentIsAdmin && payload.id) {
         const deleteButton = document.createElement("button");
         deleteButton.className = "secondary small-btn msg-delete-btn";
         deleteButton.textContent = t("delete");
         deleteButton.type = "button";
         deleteButton.addEventListener("click", () => deleteMessage(payload.id));
-        div.appendChild(deleteButton);
+        actions.appendChild(deleteButton);
+    }
+
+    if (actions.children.length) {
+        div.appendChild(actions);
     }
 
     return div;
@@ -685,6 +730,10 @@ function createMessageNode(payload) {
 function addMessage(payload) {
     const chat = document.getElementById("chat");
     const div = createMessageNode(payload);
+
+    if (payload.id) {
+        messageCache.set(Number(payload.id), payload);
+    }
 
     chat.appendChild(div);
     toggleChatEmptyState();
@@ -875,6 +924,39 @@ function getFilteredRooms() {
     });
 
     return rooms;
+}
+
+function getReplyTextPreview(message) {
+    if (!message) return "";
+
+    const text = (message.text || "").trim();
+
+    if (text) return text;
+
+    if (message.file_name) return message.file_name;
+
+    if (message.content_type === "image") return t("attachmentLabel");
+    if (message.content_type === "video") return t("attachmentLabel");
+
+    return t("attachmentLabel");
+}
+
+function setReplyTarget(messageId) {
+    const message = messageCache.get(Number(messageId));
+    if (!message) return;
+
+    replyTarget = message;
+
+    document.getElementById("replyPreviewTitle").textContent = message.username;
+    document.getElementById("replyPreviewText").textContent = getReplyTextPreview(message);
+    document.getElementById("replyPreview").classList.remove("hidden");
+
+    document.getElementById("message").focus();
+}
+
+function clearReplyTarget() {
+    replyTarget = null;
+    document.getElementById("replyPreview").classList.add("hidden");
 }
 
 function renderRooms() {
@@ -1069,6 +1151,9 @@ async function loadMessages({ older = false } = {}) {
             const fragment = document.createDocumentFragment();
 
             for (const message of messages) {
+                if (message.id) {
+                    messageCache.set(Number(message.id), message);
+                }
                 fragment.appendChild(createMessageNode(message));
             }
 
@@ -1189,8 +1274,12 @@ function sendMessage() {
         return;
     }
 
-    ws.send(JSON.stringify({ text }));
+    ws.send(JSON.stringify({
+        text,
+        reply_to_id: replyTarget?.id || null
+    }));
     input.value = "";
+    clearReplyTarget();
     setComposerStatus("");
 }
 
@@ -1347,6 +1436,14 @@ function resetActiveRoomState() {
     currentRoom = "";
     currentRoomToken = "";
 
+    replyTarget = null;
+    messageCache.clear();
+
+    const replyPreview = document.getElementById("replyPreview");
+    if (replyPreview) {
+        replyPreview.classList.add("hidden");
+    }
+
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");
     document.getElementById("roomUsersBtn").classList.add("hidden");
@@ -1380,6 +1477,10 @@ async function handleAttachmentSelect(event) {
     formData.append("text", caption);
     formData.append("file", file);
 
+    if (replyTarget?.id) {
+        formData.append("reply_to_id", String(replyTarget.id));
+    }
+
     setComposerStatus(t("uploadingFile", { file: file.name }));
 
     try {
@@ -1395,6 +1496,8 @@ async function handleAttachmentSelect(event) {
             setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
             return;
         }
+
+        clearReplyTarget();
 
         if (shouldAppendHttpResponse()) {
             addMessage(data);

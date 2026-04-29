@@ -44,11 +44,11 @@
             <div class="section hidden" id="roomsSection">
                 <div class="topbar">
                     <div class="whoami-row">
-                    <b id="whoami"></b>
-                    <span id="adminTopBadge" class="admin-badge hidden">👑 Admin</span>
-                </div>
+                        <b id="whoami"></b>
+                        <span id="adminTopBadge" class="admin-badge hidden">👑 Admin</span>
+                    </div>
 
-                <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
+                    <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
                 </div>
 
                 <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
@@ -118,8 +118,10 @@
                         </div>
                     </div>
                     <div class="chat-actions">
-                        <button id="roomUsersBtn" class="secondary small-btn hidden" onclick="toggleUsersPopup()">Users</button>
-                        <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit chat</button>
+                        <button id="roomUsersBtn" class="secondary small-btn hidden"
+                            onclick="toggleUsersPopup()">Users</button>
+                        <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit
+                            chat</button>
                     </div>
                 </div>
             </div>
@@ -141,6 +143,13 @@
                 <div class="composer-tools">
                     <button id="pickMediaBtn" class="secondary tool-btn" onclick="pickMedia()">Photo or video</button>
                     <button id="pickFileBtn" class="secondary tool-btn" onclick="pickFile()">File</button>
+                </div>
+                <div id="replyPreview" class="reply-preview hidden">
+                    <div>
+                        <div class="reply-preview-title" id="replyPreviewTitle"></div>
+                        <div class="reply-preview-text" id="replyPreviewText"></div>
+                    </div>
+                    <button type="button" class="reply-preview-close" onclick="clearReplyTarget()">×</button>
                 </div>
                 <div class="input-row">
                     <input id="message" placeholder="Type a message or add a caption..."

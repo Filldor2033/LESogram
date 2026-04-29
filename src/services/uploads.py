@@ -5,7 +5,6 @@ from fastapi import HTTPException
 
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
-from fastapi import HTTPException
 
 from core.config import *
 from models import Message

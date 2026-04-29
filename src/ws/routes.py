@@ -83,6 +83,13 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         while True:
             data = await websocket.receive_json()
             text = (data.get("text") or "").strip()
+            reply_to_id = data.get("reply_to_id")
+            
+            if reply_to_id is not None:
+                try:
+                    reply_to_id = int(reply_to_id)
+                except (TypeError, ValueError):
+                    reply_to_id = None
 
             if not text or len(text) > MAX_MESSAGE_LENGTH:
                 continue
@@ -110,6 +117,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                     room=room,
                     text=text,
                     content_type="text",
+                    reply_to_id=reply_to_id,
                 )
 
             await manager.broadcast_json(serialize_message(message), room)

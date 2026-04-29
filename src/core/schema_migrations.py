@@ -1,4 +1,4 @@
-from database import Base, engine
+from database import engine
 
 
 async def ensure_user_schema():
@@ -56,4 +56,9 @@ async def ensure_message_schema():
         if "file_size" not in columns:
             await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN file_size INTEGER"
+            )
+        
+        if "reply_to_id" not in columns:
+            await conn.exec_driver_sql(
+                "ALTER TABLE messages ADD COLUMN reply_to_id INTEGER"
             )

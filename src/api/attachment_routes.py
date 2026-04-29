@@ -69,6 +69,7 @@ async def upload_attachment(
     request: Request,
     room_token: str = Form(...),
     text: str = Form(default=""),
+    reply_to_id: int | None = Form(default=None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
@@ -110,7 +111,7 @@ async def upload_attachment(
             status_code=413,
             detail=f"Attachment is too large. Max size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
         )
-        
+
     if content_type == "image":
         validate_image_content(content)
 
@@ -119,6 +120,17 @@ async def upload_attachment(
     stored_path = UPLOADS_DIR / stored_name
 
     await asyncio.to_thread(stored_path.write_bytes, content)
+    
+    if reply_to_id is not None:
+        reply_result = await db.execute(
+            select(Message).where(
+                Message.id == reply_to_id,
+                Message.room == room,
+            )
+        )
+
+        if not reply_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Reply message not found")
 
     message = await save_message(
         db,
@@ -130,6 +142,7 @@ async def upload_attachment(
         file_name=safe_filename,
         mime_type=mime_type,
         file_size=len(content),
+        reply_to_id=reply_to_id,
     )
 
     payload = serialize_message(message)
