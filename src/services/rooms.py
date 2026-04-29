@@ -1,11 +1,12 @@
-from jose import JWTError, jwt
+from collections import Counter, defaultdict
+
 from fastapi import HTTPException
+from jose import JWTError, jwt
 from sqlalchemy import select
 
 from auth import ALGORITHM, SECRET_KEY
 from models import Room
 from utils.time import utc_now
-from collections import Counter, defaultdict
 
 room_members: dict[str, Counter[str]] = defaultdict(Counter)
 

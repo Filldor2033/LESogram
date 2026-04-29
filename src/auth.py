@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
-from pwdlib import PasswordHash
 import os
 import secrets
+from datetime import datetime, timedelta, timezone
+
+from jose import JWTError, jwt
+from pwdlib import PasswordHash
 
 SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 ALGORITHM = "HS256"

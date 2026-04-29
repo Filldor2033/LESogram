@@ -2,13 +2,9 @@ import pytest
 from fastapi import HTTPException
 
 import services.uploads as uploads_module
-from services.uploads import (
-    sanitize_filename,
-    determine_upload_content_type,
-    build_attachment_path,
-)
-
-from tests.helpers import register, create_room_and_join
+from services.uploads import (build_attachment_path,
+                              determine_upload_content_type, sanitize_filename)
+from tests.helpers import create_room_and_join, register
 
 
 def test_sanitize_filename_edge_cases():

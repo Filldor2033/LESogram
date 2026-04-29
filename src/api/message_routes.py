@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Query, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user_model, get_db
-from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
+from core.rate_limit import (enforce_http_rate_limit,
+                             enforce_http_rate_limit_for_user)
 from models import Message, User
 from schemas import EditMessageRequest
 from services.messages import normalize_message_text, serialize_message

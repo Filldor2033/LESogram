@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from core.config import UPLOADS_DIR
+from core.rate_limit import rate_limiter
 from core.schema_migrations import ensure_message_schema, ensure_user_schema
 from database import Base, engine
-from core.rate_limit import rate_limiter
 
 
 @asynccontextmanager

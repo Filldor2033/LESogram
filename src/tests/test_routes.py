@@ -1,4 +1,4 @@
-from tests.helpers import register, create_room_and_join, make_admin
+from tests.helpers import create_room_and_join, make_admin, register
 
 
 def test_create_room_requires_auth(client):

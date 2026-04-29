@@ -1,11 +1,11 @@
 import asyncio
-import pytest
 
+import pytest
 from starlette.requests import Request
 from starlette.responses import Response
 
 from core.security_headers import add_security_headers
-from schemas import RegisterRequest, LoginRequest
+from schemas import LoginRequest, RegisterRequest
 
 
 def test_register_request_invalid_username_chars():

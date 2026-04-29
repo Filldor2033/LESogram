@@ -10,19 +10,19 @@ sys.path.insert(0, str(SRC_DIR))
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
+                                    create_async_engine)
 from sqlalchemy.pool import StaticPool
 
-import main
 import api.deps as deps
 import core.lifespan as lifespan_module
+import main
 import services.uploads as uploads_module
 import ws.routes as ws_routes
-
+from core.rate_limit import rate_limiter
 from models import Base
 from services.rooms import room_members
 from ws.manager import manager
-from core.rate_limit import rate_limiter
 
 
 @pytest.fixture()

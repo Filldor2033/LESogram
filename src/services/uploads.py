@@ -1,9 +1,8 @@
 import mimetypes
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import HTTPException
-
-from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 
 from core.config import *

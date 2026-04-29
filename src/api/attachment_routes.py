@@ -2,23 +2,23 @@ import asyncio
 import mimetypes
 import secrets
 
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, UploadFile
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request,
+                     UploadFile)
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, get_current_user_model
+from api.deps import get_current_user_model, get_db
 from core.config import *
-from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
-from services.messages import normalize_message_text, save_message, serialize_message
-from services.rooms import require_room_access
+from core.rate_limit import (enforce_http_rate_limit,
+                             enforce_http_rate_limit_for_user)
 from models import Message, User
-from services.uploads import (
-    build_attachment_path,
-    determine_upload_content_type,
-    sanitize_filename,
-    validate_image_content,
-)
+from services.messages import (normalize_message_text, save_message,
+                               serialize_message)
+from services.rooms import require_room_access
+from services.uploads import (build_attachment_path,
+                              determine_upload_content_type, sanitize_filename,
+                              validate_image_content)
 from ws.manager import manager
 
 router = APIRouter()

@@ -1,4 +1,5 @@
 import re
+
 from pydantic import BaseModel, Field, field_validator
 
 SAFE_NAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9 _.-]+$")

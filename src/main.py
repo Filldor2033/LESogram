@@ -1,17 +1,15 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
+from api.attachment_routes import router as attachment_router
+from api.auth_routes import router as auth_router
+from api.message_routes import router as message_router
+from api.room_routes import router as room_router
 from core.config import STATIC_DIR
 from core.lifespan import lifespan
 from core.security_headers import add_security_headers
-
-from api.auth_routes import router as auth_router
-from api.room_routes import router as room_router
-from api.message_routes import router as message_router
-from api.attachment_routes import router as attachment_router
 from ws.routes import router as websocket_router
-
 
 app = FastAPI(title="Realtime Chat", lifespan=lifespan)
 

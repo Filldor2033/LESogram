@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_db, get_current_user_model
-from core.rate_limit import enforce_http_rate_limit
+from api.deps import get_current_user_model, get_db
 from auth import create_access_token, hash_password, verify_password
+from core.rate_limit import enforce_http_rate_limit
 from models import User
-from schemas import RegisterRequest, LoginRequest, TokenResponse
+from schemas import LoginRequest, RegisterRequest, TokenResponse
 
 router = APIRouter()
 

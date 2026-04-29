@@ -1,6 +1,5 @@
 import re
 
-
 MENTION_REGEX = re.compile(r"@(\w{1,32})")
 
 
