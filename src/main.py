@@ -763,7 +763,8 @@ async def list_room_users(
 ):
     enforce_http_rate_limit(request, "list_room_users", 120, 60)
 
-    require_room_access(room, room_token, db)
+    username = await require_room_access(room, room_token, db)
+    del username
 
     result = await db.execute(
         select(Room).where(Room.name == room)
@@ -963,7 +964,8 @@ async def get_messages(
 ):
     enforce_http_rate_limit(request, "get_messages", 120, 60)
 
-    require_room_access(room,room_token,db)
+    username = await require_room_access(room,room_token,db)
+    del username
 
     query = select(Message).where(Message.room == room)
 
@@ -1005,9 +1007,8 @@ async def get_attachment(
     if not message or not message.media_url:
         raise HTTPException(status_code=404, detail="Attachment not found")
 
-    username = verify_room_token(room_token, message.room)
-    if not username:
-        raise HTTPException(status_code=403, detail="No access to this room")
+    username = await require_room_access(message.room, room_token, db)
+    del username
 
     file_path = build_attachment_path(message.media_url)
     if not file_path or not file_path.exists() or not file_path.is_file():
@@ -1046,8 +1047,8 @@ async def upload_attachment(
         current_user,
     )
 
-    username = verify_room_token(room_token, room)
-    if not username or username != current_user.username:
+    username = await require_room_access(room, room_token, db)
+    if username != current_user.username:
         raise HTTPException(status_code=403, detail="No access to this room")
 
     if not file.filename:
