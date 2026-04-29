@@ -353,7 +353,7 @@ def test_get_attachment_cascade_404(client):
         ws.receive_json()
     
     resp = client.get(f"/messages/general?room_token={room_token}")
-    msg_id = resp.json()[-1]["id"]
+    msg_id = resp.json()["messages"][-1]["id"]
     
     response = client.get(f"/attachments/{msg_id}?room_token=" + room_token)
     assert response.status_code == 404

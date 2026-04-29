@@ -161,7 +161,11 @@ def test_message_history_requires_room_token(client):
     response = client.get(f"/messages/general?room_token={room_token}")
 
     assert response.status_code == 200
-    assert response.json() == []
+    
+    data = response.json()
+    assert data["messages"] == []
+    assert data["has_more"] is False
+    assert data["next_before_id"] is None
 
 
 def test_websocket_send_message_and_history(client):
@@ -186,7 +190,8 @@ def test_websocket_send_message_and_history(client):
     response = client.get(f"/messages/general?room_token={room_token}")
 
     assert response.status_code == 200
-    messages = response.json()
+    data = response.json()
+    messages = data["messages"]
 
     assert len(messages) == 1
     assert messages[0]["text"] == "Hello world"
