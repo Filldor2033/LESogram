@@ -45,7 +45,7 @@ class ConnectionManager:
 
         for conn in dead:
             self.disconnect(conn, room)
-            
+
     async def send_personal_json(
         self,
         data: dict,

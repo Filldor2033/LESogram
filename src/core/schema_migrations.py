@@ -62,7 +62,7 @@ async def ensure_message_schema():
             await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN reply_to_id INTEGER"
             )
-            
+
         if "edited_at" not in columns:
             await conn.exec_driver_sql(
                 "ALTER TABLE messages ADD COLUMN edited_at DATETIME"

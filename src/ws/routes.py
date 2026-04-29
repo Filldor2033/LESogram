@@ -141,12 +141,13 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
 
             payload = serialize_message(message)
             await manager.broadcast_json(payload, room)
-            
+
             mentions = extract_mentions(text)
             valid_mentions = [
                 mentioned_user
                 for mentioned_user in mentions
-                if mentioned_user != username and mentioned_user in room_members.get(room, {})
+                if mentioned_user != username
+                and mentioned_user in room_members.get(room, {})
             ]
 
             for mentioned_user in valid_mentions:

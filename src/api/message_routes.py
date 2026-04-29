@@ -119,9 +119,7 @@ async def edit_message(
 
     new_text = normalize_message_text(payload.text, allow_empty=False)
 
-    result = await db.execute(
-        select(Message).where(Message.id == message_id)
-    )
+    result = await db.execute(select(Message).where(Message.id == message_id))
     message = result.scalar_one_or_none()
 
     if not message:

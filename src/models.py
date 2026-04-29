@@ -57,7 +57,7 @@ class Message(Base):
         Integer,
         nullable=True,
     )
-    
+
     edited_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
