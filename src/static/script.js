@@ -285,6 +285,9 @@ let messagesNextBeforeId = null;
 let messagesHasMore = true;
 let messagesLoading = false;
 
+let pendingAttachmentFile = null;
+let pendingAttachmentUrl = "";
+
 let notificationsEnabled = localStorage.getItem("notifications_enabled") === "1";
 
 let mentionUsers = [];
@@ -412,6 +415,117 @@ function setInputPlaceholder(id, key) {
     const el = document.getElementById(id);
     if (el) {
         el.placeholder = t(key);
+    }
+}
+
+function setPendingAttachment(file) {
+    if (!file || !ensureRoomSelected()) return;
+
+    clearPendingAttachment();
+
+    pendingAttachmentFile = file;
+
+    const preview = document.getElementById("uploadPreview");
+    const media = document.getElementById("uploadPreviewMedia");
+    const name = document.getElementById("uploadPreviewName");
+    const meta = document.getElementById("uploadPreviewMeta");
+
+    media.innerHTML = "";
+    name.textContent = file.name;
+    meta.textContent = [file.type || t("fileLabel"), formatBytes(file.size)].filter(Boolean).join(" | ");
+
+    if (file.type.startsWith("image/")) {
+        pendingAttachmentUrl = URL.createObjectURL(file);
+
+        const img = document.createElement("img");
+        img.src = pendingAttachmentUrl;
+        img.alt = file.name;
+
+        media.appendChild(img);
+    } else if (file.type.startsWith("video/")) {
+        pendingAttachmentUrl = URL.createObjectURL(file);
+
+        const video = document.createElement("video");
+        video.src = pendingAttachmentUrl;
+        video.muted = true;
+        video.playsInline = true;
+
+        media.appendChild(video);
+    } else {
+        media.textContent = "📎";
+    }
+
+    preview.classList.remove("hidden");
+    document.getElementById("message").focus();
+}
+
+function clearPendingAttachment() {
+    pendingAttachmentFile = null;
+
+    if (pendingAttachmentUrl) {
+        URL.revokeObjectURL(pendingAttachmentUrl);
+        pendingAttachmentUrl = "";
+    }
+
+    const preview = document.getElementById("uploadPreview");
+    const media = document.getElementById("uploadPreviewMedia");
+
+    if (preview) preview.classList.add("hidden");
+    if (media) media.innerHTML = "";
+}
+
+async function handleAttachmentSelect(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = "";
+
+    if (!file) return;
+
+    setPendingAttachment(file);
+}
+
+async function sendPendingAttachment() {
+    if (!pendingAttachmentFile || !ensureRoomSelected()) return;
+
+    const file = pendingAttachmentFile;
+    const caption = document.getElementById("message").value.trim();
+
+    const formData = new FormData();
+    formData.append("room_token", currentRoomToken);
+    formData.append("text", caption);
+    formData.append("file", file);
+
+    if (replyTarget?.id) {
+        formData.append("reply_to_id", String(replyTarget.id));
+    }
+
+    setComposerStatus(t("uploadingFile", { file: file.name }));
+
+    try {
+        const res = await fetch(`/rooms/${encodeURIComponent(currentRoom)}/attachments`, {
+            method: "POST",
+            headers: authHeaders({ json: false }),
+            body: formData
+        });
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
+            return;
+        }
+
+        clearPendingAttachment();
+        clearReplyTarget();
+
+        if (shouldAppendHttpResponse()) {
+            addMessage(data);
+        }
+
+        document.getElementById("message").value = "";
+        setComposerStatus(t("fileSent", { file: file.name }));
+    } catch {
+        setComposerStatus(t("uploadFailed"), true);
     }
 }
 
@@ -1692,7 +1806,11 @@ function handleComposerKey(event) {
 
     if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        sendMessage();
+        if (pendingAttachmentFile) {
+            sendPendingAttachment();
+        } else {
+            sendMessage();
+        }
     }
 }
 
@@ -2004,6 +2122,8 @@ function resetActiveRoomState() {
     mentionUsers = [];
     closeMentionDropdown();
 
+    clearPendingAttachment();
+
     typingUsers.clear();
     clearTimeout(typingStopTimer);
     clearTimeout(typingRenderTimer);
@@ -2159,3 +2279,50 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("resize", closeMessageContextMenu);
+
+const chatElement = document.getElementById("chat");
+
+chatElement.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    if (!currentRoom) return;
+    chatElement.classList.add("drag-over");
+});
+
+chatElement.addEventListener("dragleave", () => {
+    chatElement.classList.remove("drag-over");
+});
+
+chatElement.addEventListener("drop", (event) => {
+    event.preventDefault();
+    chatElement.classList.remove("drag-over");
+
+    if (!ensureRoomSelected()) return;
+
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+
+    setPendingAttachment(file);
+});
+
+document.addEventListener("paste", (event) => {
+    if (!currentRoom || !currentRoomToken) return;
+
+    const items = Array.from(event.clipboardData?.items || []);
+    const fileItem = items.find(item => item.kind === "file");
+
+    if (!fileItem) return;
+
+    const file = fileItem.getAsFile();
+    if (!file) return;
+
+    event.preventDefault();
+
+    const extension = file.type.startsWith("image/") ? "png" : "file";
+    const namedFile = new File(
+        [file],
+        file.name || `pasted-${Date.now()}.${extension}`,
+        { type: file.type }
+    );
+
+    setPendingAttachment(namedFile);
+});

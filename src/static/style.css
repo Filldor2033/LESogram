@@ -261,6 +261,71 @@ select {
     width: auto;
 }
 
+.upload-preview {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 16px;
+    background: rgba(34, 197, 94, 0.10);
+    border: 1px solid rgba(34, 197, 94, 0.16);
+}
+
+.upload-preview-media {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(2, 6, 23, 0.35);
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 28px;
+}
+
+.upload-preview-media img,
+.upload-preview-media video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.upload-preview-info {
+    min-width: 0;
+}
+
+.upload-preview-name {
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-preview-meta {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.upload-preview-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.upload-preview-actions button {
+    width: auto;
+}
+
+.chat.drag-over {
+    outline: 2px dashed var(--accent);
+    outline-offset: -10px;
+    background:
+        radial-gradient(circle at center, rgba(34, 197, 94, 0.16), transparent 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 16%);
+}
+
 .context-menu {
     position: fixed;
     z-index: 9999;
@@ -1195,6 +1260,21 @@ body {
 
     .users-list {
         max-height: 260px;
+    }
+}
+
+@media (max-width: 600px) {
+    .upload-preview {
+        grid-template-columns: 56px minmax(0, 1fr);
+    }
+
+    .upload-preview-media {
+        width: 56px;
+        height: 56px;
+    }
+
+    .upload-preview-actions {
+        grid-column: 1 / -1;
     }
 }
 

@@ -156,6 +156,20 @@
                     <button type="button" class="reply-preview-close" onclick="clearReplyTarget()">×</button>
                 </div>
                 <div id="mentionDropdown" class="mention-dropdown hidden"></div>
+                <div id="uploadPreview" class="upload-preview hidden">
+                    <div id="uploadPreviewMedia" class="upload-preview-media"></div>
+
+                    <div class="upload-preview-info">
+                        <div id="uploadPreviewName" class="upload-preview-name"></div>
+                        <div id="uploadPreviewMeta" class="upload-preview-meta"></div>
+                    </div>
+
+                    <div class="upload-preview-actions">
+                        <button type="button" class="small-btn" onclick="sendPendingAttachment()">Send</button>
+                        <button type="button" class="secondary small-btn"
+                            onclick="clearPendingAttachment()">Cancel</button>
+                    </div>
+                </div>
                 <div class="input-row">
                     <input id="message" placeholder="Type a message or add a caption..."
                         onkeydown="handleComposerKey(event)"
