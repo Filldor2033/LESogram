@@ -4,18 +4,16 @@ on:
   push:
     paths:
       - "src/**"
+      - "!src/static/**"
       - "requirements.txt"
       - ".github/workflows/**"
-    paths-ignore:
-      - "src/static/**"
 
   pull_request:
     paths:
       - "src/**"
+      - "!src/static/**"
       - "requirements.txt"
       - ".github/workflows/**"
-    paths-ignore:
-      - "src/static/**"
 
 jobs:
   pytest:
@@ -43,4 +41,4 @@ jobs:
       - name: Run tests
         working-directory: src
         run: |
-          python -m pytest -q
+          python -m pytest -q --ignore=static
