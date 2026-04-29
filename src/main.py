@@ -342,8 +342,9 @@ def enforce_websocket_rate_limit(websocket: WebSocket, bucket: str, identifier: 
 
 
 class ConnectionManager:
-    def __init__(self):
+    def __init__(self, concurrent_threshold: int = 10):
         self.active_connections: dict[str, list[WebSocket]] = defaultdict(list)
+        self.concurrent_threshold = concurrent_threshold
 
     async def connect(self, websocket: WebSocket, room: str):
         await websocket.accept()
@@ -360,23 +361,75 @@ class ConnectionManager:
             conn for conn in self.active_connections.get(room, [])
             if conn.client_state == WebSocketState.CONNECTED
         ]
+
         if not connections:
             return
 
-        dead = []
-
-        async with asyncio.TaskGroup() as tg:
-            for conn in connections:
-                tg.create_task(self._send_and_track(conn, data, room, dead))
+        if len(connections) < self.concurrent_threshold:
+            dead = await self._broadcast_sequential(data, room, connections)
+        else:
+            dead = await self._broadcast_concurrent(data, room, connections)
 
         for conn in dead:
             self.disconnect(conn, room)
 
-    async def _send_and_track(self, websocket: WebSocket, data: dict, room: str, dead_list: list):
+    async def _broadcast_sequential(
+        self,
+        data: dict,
+        room: str,
+        connections: list[WebSocket],
+    ) -> list[WebSocket]:
+        dead = []
+
+        for conn in connections:
+            ok = await self._send_safe(conn, data)
+            if not ok:
+                dead.append(conn)
+
+        return dead
+
+    async def _broadcast_concurrent(
+        self,
+        data: dict,
+        room: str,
+        connections: list[WebSocket],
+    ) -> list[WebSocket]:
+        dead = []
+
+        async with asyncio.TaskGroup() as tg:
+            for conn in connections:
+                tg.create_task(
+                    self._send_and_track(conn, data, dead)
+                )
+
+        return dead
+
+    async def _send_and_track(
+        self,
+        websocket: WebSocket,
+        data: dict,
+        dead_list: list[WebSocket],
+    ):
+        ok = await self._send_safe(websocket, data)
+        if not ok:
+            dead_list.append(websocket)
+
+    async def _send_safe(
+        self,
+        websocket: WebSocket,
+        data: dict,
+    ) -> bool:
         try:
             await asyncio.wait_for(websocket.send_json(data), timeout=5.0)
-        except (WebSocketDisconnect, ConnectionResetError, asyncio.TimeoutError, OSError, RuntimeError):
-            dead_list.append(websocket)
+            return True
+        except (
+            WebSocketDisconnect,
+            ConnectionResetError,
+            asyncio.TimeoutError,
+            OSError,
+            RuntimeError,
+        ):
+            return False
 
     async def close_room(self, room: str, code: int = 1008):
         connections = list(self.active_connections.get(room, []))
@@ -1045,6 +1098,10 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
             await manager.broadcast_json(serialize_message(message), room)
 
     except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        print("WebSocket error:", repr(exc))
+    finally:
         manager.disconnect(websocket, room)
 
         went_offline = False
