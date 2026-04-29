@@ -174,9 +174,14 @@ class SlidingWindowRateLimiter:
         if self._cleanup_task is None or self._cleanup_task.done():
             self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
-    def stop_cleanup(self):
+    async def stop_cleanup(self):
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
 
 
 rate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
@@ -251,7 +256,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    rate_limiter.stop_cleanup()
+    await rate_limiter.stop_cleanup()
+    await engine.dispose()
 
 
 app = FastAPI(title="Realtime Chat", lifespan=lifespan)
