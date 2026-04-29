@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -33,6 +34,8 @@ def session_factory():
     )
 
     yield TestingSessionLocal, engine
+    
+    asyncio.run(engine.dispose())
 
 
 @pytest.fixture()
