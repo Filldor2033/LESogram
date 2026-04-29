@@ -21,6 +21,8 @@ const translations = {
         logout: "Exit",
         adminBadge: "Admin",
         youBadge: "you",
+        mentionTitle: "You were mentioned",
+        mentionStatus: "@{user} mentioned you",
         onlineBadge: "online",
         createRoomTitle: "Create Room",
         newRoomNamePlaceholder: "New room name",
@@ -139,6 +141,8 @@ const translations = {
         logout: "Выйти",
         adminBadge: "Админ",
         youBadge: "вы",
+        mentionTitle: "Вас упомянули",
+        mentionStatus: "@{user} упомянул(а) вас",
         onlineBadge: "онлайн",
         createRoomTitle: "Создать комнату",
         newRoomNamePlaceholder: "Название новой комнаты",
@@ -322,6 +326,16 @@ function getInitialLanguage() {
 function t(key, vars = {}) {
     const source = translations[currentLanguage][key] ?? translations.en[key] ?? key;
     return source.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    }[char]));
 }
 
 function pluralizeRu(count, one, few, many) {
@@ -914,16 +928,19 @@ function maybeNotify(payload) {
 }
 
 function highlightMentions(text) {
-    return text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    return escapeHtml(text).replace(
+        /@([A-Za-z0-9_а-яА-ЯёЁ-]+)/g,
+        '<span class="mention">@$1</span>'
+    );
 }
 
 function handleMention(payload) {
     const text = `${payload.from}: ${payload.text}`;
 
-    showNotification("You were mentioned", text);
+    showNotification(t("mentionTitle"), text);
 
     if (payload.room !== currentRoom) {
-        setStatus("roomStatus", `@${payload.from} mentioned you`, false);
+        setStatus("roomStatus", t("mentionStatus", { user: payload.from }), false);
     }
 }
 
@@ -1014,7 +1031,7 @@ function createMessageNode(payload) {
         const text = document.createElement("div");
         text.className = "msg-text";
         text.innerHTML = highlightMentions(payload.text);
-        text.textContent = payload.text;
+        // text.textContent = payload.text;
         div.appendChild(text);
     }
 
@@ -1584,6 +1601,19 @@ function connectWS() {
             return;
         }
 
+        if (payload.type === "system") {
+            if (["joined", "left"].includes(payload.system_event)) {
+                refreshMentionUsers();
+
+                if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
+                    loadRoomUsers();
+                }
+            }
+
+            addMessage(payload);
+            return;
+        }
+
         maybeNotify(payload);
 
         addMessage(payload);
@@ -1866,8 +1896,6 @@ async function loadRoomUsers() {
 
         subtitle.textContent = formatRoomCount(data.count || 0);
         renderUsersList(data.users || []);
-
-        await setMentionUsers(data);
     } catch {
         list.innerHTML = `<div class="users-empty">${t("cannotLoadRooms")}</div>`;
         subtitle.textContent = formatRoomCount(0);

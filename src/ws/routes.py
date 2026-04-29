@@ -71,6 +71,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     is_admin = bool(user.is_admin)
 
     await manager.connect(websocket, room)
+    websocket.state.username = username
 
     was_offline = room_members[room][username] == 0
     room_members[room][username] += 1

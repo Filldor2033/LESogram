@@ -213,8 +213,11 @@ select {
 }
 
 .mention {
-    color: #22c55e;
+    color: #86efac;
     font-weight: bold;
+    background: rgba(34, 197, 94, 0.12);
+    padding: 1px 4px;
+    border-radius: 6px;
 }
 
 .mention-dropdown {
