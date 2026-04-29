@@ -155,9 +155,11 @@
                     </div>
                     <button type="button" class="reply-preview-close" onclick="clearReplyTarget()">×</button>
                 </div>
+                <div id="mentionDropdown" class="mention-dropdown hidden"></div>
                 <div class="input-row">
                     <input id="message" placeholder="Type a message or add a caption..."
-                        onkeydown="handleComposerKey(event)" oninput="handleMessageInputTyping()" />
+                        onkeydown="handleComposerKey(event)"
+                        oninput="handleMessageInputTyping(); handleComposerInput();" />
                     <button id="sendBtn" style="width:120px" onclick="sendMessage()">Send</button>
                 </div>
                 <div id="composerStatus" class="status composer-status"></div>

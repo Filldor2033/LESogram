@@ -283,6 +283,9 @@ let messagesLoading = false;
 
 let notificationsEnabled = localStorage.getItem("notifications_enabled") === "1";
 
+let mentionUsers = [];
+let mentionDropdownIndex = 0;
+
 const messageCache = new Map();
 
 async function loadMe() {
@@ -1453,6 +1456,7 @@ async function joinRoom(roomName, pwdInput) {
 
     clearChat();
     await loadMessages();
+    await refreshMentionUsers();
     connectWS();
 
     setRoomsListCollapsed(true);
@@ -1616,6 +1620,38 @@ function ensureRoomSelected() {
 }
 
 function handleComposerKey(event) {
+    const dropdown = document.getElementById("mentionDropdown");
+
+    if (dropdown && !dropdown.classList.contains("hidden")) {
+        const options = getVisibleMentionOptions();
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            mentionDropdownIndex = (mentionDropdownIndex + 1) % options.length;
+            renderMentionDropdown();
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            mentionDropdownIndex = (mentionDropdownIndex - 1 + options.length) % options.length;
+            renderMentionDropdown();
+            return;
+        }
+
+        if (event.key === "Enter" || event.key === "Tab") {
+            event.preventDefault();
+            insertMention(options[mentionDropdownIndex]);
+            return;
+        }
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMentionDropdown();
+            return;
+        }
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         sendMessage();
@@ -1687,6 +1723,124 @@ async function deleteRoom(roomName) {
     await loadRooms();
 }
 
+function handleComposerInput() {
+    handleMessageInputTyping();
+    mentionDropdownIndex = 0;
+    renderMentionDropdown();
+}
+
+function closeMentionDropdown() {
+    const dropdown = document.getElementById("mentionDropdown");
+    if (dropdown) {
+        dropdown.classList.add("hidden");
+        dropdown.innerHTML = "";
+    }
+}
+
+function getVisibleMentionOptions() {
+    return Array.from(document.querySelectorAll("#mentionDropdown .mention-option"))
+        .map(node => node.textContent.replace(/^@/, ""));
+}
+
+function insertMention(username) {
+    const input = document.getElementById("message");
+    const mention = getCurrentMentionQuery(input);
+
+    if (!mention) return;
+
+    const before = input.value.slice(0, mention.start);
+    const after = input.value.slice(mention.end);
+
+    input.value = `${before}@${username} ${after}`;
+    const cursor = before.length + username.length + 2;
+
+    input.focus();
+    input.setSelectionRange(cursor, cursor);
+
+    closeMentionDropdown();
+    handleMessageInputTyping();
+}
+
+function renderMentionDropdown() {
+    const input = document.getElementById("message");
+    const dropdown = document.getElementById("mentionDropdown");
+    const mention = getCurrentMentionQuery(input);
+
+    if (!dropdown || !mention) {
+        closeMentionDropdown();
+        return;
+    }
+
+    const users = mentionUsers
+        .filter(username => username.toLowerCase().includes(mention.query))
+        .slice(0, 8);
+
+    if (!users.length) {
+        closeMentionDropdown();
+        return;
+    }
+
+    mentionDropdownIndex = Math.min(mentionDropdownIndex, users.length - 1);
+
+    dropdown.innerHTML = "";
+
+    users.forEach((username, index) => {
+        const item = document.createElement("div");
+        item.className = "mention-option" + (index === mentionDropdownIndex ? " active" : "");
+        item.textContent = `@${username}`;
+        item.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            insertMention(username);
+        });
+
+        dropdown.appendChild(item);
+    });
+
+    dropdown.classList.remove("hidden");
+}
+
+function getCurrentMentionQuery(input) {
+    const value = input.value;
+    const cursor = input.selectionStart ?? value.length;
+    const beforeCursor = value.slice(0, cursor);
+
+    const match = beforeCursor.match(/(^|\s)@([A-Za-z0-9_а-яА-ЯёЁ-]{0,32})$/);
+
+    if (!match) return null;
+
+    return {
+        query: match[2].toLowerCase(),
+        start: cursor - match[2].length - 1,
+        end: cursor,
+    };
+}
+
+async function refreshMentionUsers() {
+    if (!currentRoom || !currentRoomToken) {
+        mentionUsers = [];
+        return;
+    }
+
+    const res = await fetch(
+        `/rooms/${encodeURIComponent(currentRoom)}/users?room_token=${encodeURIComponent(currentRoomToken)}`
+    );
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        mentionUsers = [];
+        return;
+    }
+
+    await setMentionUsers(data);
+}
+
+async function setMentionUsers(data) {
+    mentionUsers = (data.users || [])
+        .map(user => typeof user === "string" ? user : user.username)
+        .filter(username => username && username !== currentUser);
+}
+
 async function loadRoomUsers() {
     if (!currentRoom || !currentRoomToken) return;
 
@@ -1712,6 +1866,8 @@ async function loadRoomUsers() {
 
         subtitle.textContent = formatRoomCount(data.count || 0);
         renderUsersList(data.users || []);
+
+        await setMentionUsers(data);
     } catch {
         list.innerHTML = `<div class="users-empty">${t("cannotLoadRooms")}</div>`;
         subtitle.textContent = formatRoomCount(0);
@@ -1808,6 +1964,9 @@ function resetActiveRoomState() {
     if (replyPreview) {
         replyPreview.classList.add("hidden");
     }
+
+    mentionUsers = [];
+    closeMentionDropdown();
 
     typingUsers.clear();
     clearTimeout(typingStopTimer);
