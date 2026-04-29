@@ -45,6 +45,20 @@ class ConnectionManager:
 
         for conn in dead:
             self.disconnect(conn, room)
+            
+    async def send_personal_json(
+        self,
+        data: dict,
+        room: str,
+        username: str,
+    ):
+        connections = self.active_connections.get(room, [])
+
+        for conn in connections:
+            if getattr(conn.state, "username", None) != username:
+                continue
+
+            await self._send_safe(conn, data)
 
     async def _broadcast_sequential(
         self,

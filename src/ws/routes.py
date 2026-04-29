@@ -10,6 +10,7 @@ from core.rate_limit import (
     get_client_ip_from_websocket,
     enforce_websocket_rate_limit,
 )
+from services.parse import extract_mentions
 from services.rooms import (
     verify_room_token,
     room_members,
@@ -137,7 +138,29 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                     reply_to_id=reply_to_id,
                 )
 
-            await manager.broadcast_json(serialize_message(message), room)
+            payload = serialize_message(message)
+            await manager.broadcast_json(payload, room)
+            
+            mentions = extract_mentions(text)
+            valid_mentions = [
+                mentioned_user
+                for mentioned_user in mentions
+                if mentioned_user != username and mentioned_user in room_members.get(room, {})
+            ]
+
+            for mentioned_user in valid_mentions:
+                await manager.send_personal_json(
+                    {
+                        "type": "mention",
+                        "from": username,
+                        "room": room,
+                        "text": text,
+                        "message": payload,
+                        "timestamp": utc_now().isoformat(),
+                    },
+                    room,
+                    mentioned_user,
+                )
 
     except WebSocketDisconnect:
         pass

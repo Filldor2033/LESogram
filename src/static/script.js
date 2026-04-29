@@ -886,6 +886,12 @@ async function toggleNotifications() {
     }
 }
 
+function showNotification(title, body) {
+    if (Notification.permission === "granted") {
+        new Notification(title, { body });
+    }
+}
+
 function maybeNotify(payload) {
     if (!notificationsEnabled) return;
     if (!("Notification" in window)) return;
@@ -902,6 +908,20 @@ function maybeNotify(payload) {
         body,
         tag: `room-${payload.room || currentRoom}`,
     });
+}
+
+function highlightMentions(text) {
+    return text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+}
+
+function handleMention(payload) {
+    const text = `${payload.from}: ${payload.text}`;
+
+    showNotification("You were mentioned", text);
+
+    if (payload.room !== currentRoom) {
+        setStatus("roomStatus", `@${payload.from} mentioned you`, false);
+    }
 }
 
 function createMessageNode(payload) {
@@ -990,6 +1010,7 @@ function createMessageNode(payload) {
     if (hasText) {
         const text = document.createElement("div");
         text.className = "msg-text";
+        text.innerHTML = highlightMentions(payload.text);
         text.textContent = payload.text;
         div.appendChild(text);
     }
@@ -1541,6 +1562,11 @@ function connectWS() {
 
         if (payload.type === "typing") {
             handleTypingPayload(payload);
+            return;
+        }
+
+        if (payload.type === "mention") {
+            handleMention(payload);
             return;
         }
 
