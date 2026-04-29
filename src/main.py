@@ -26,6 +26,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.websockets import WebSocketState
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -242,6 +243,7 @@ def ensure_message_schema():
                 "ALTER TABLE messages ADD COLUMN file_size INTEGER"
             )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
@@ -360,15 +362,27 @@ class ConnectionManager:
                 del self.active_connections[room]
 
     async def broadcast_json(self, data: dict, room: str):
-        dead = []
-        for connection in self.active_connections.get(room, []):
-            try:
-                await connection.send_json(data)
-            except Exception:
-                dead.append(connection)
+        connections = [
+            conn for conn in self.active_connections.get(room, [])
+            if conn.client_state == WebSocketState.CONNECTED
+        ]
+        if not connections:
+            return
 
-        for connection in dead:
-            self.disconnect(connection, room)
+        dead = []
+
+        async with asyncio.TaskGroup() as tg:
+            for conn in connections:
+                tg.create_task(self._send_and_track(conn, data, room, dead))
+
+        for conn in dead:
+            self.disconnect(conn, room)
+
+    async def _send_and_track(self, websocket: WebSocket, data: dict, room: str, dead_list: list):
+        try:
+            await asyncio.wait_for(websocket.send_json(data), timeout=5.0)
+        except (WebSocketDisconnect, ConnectionResetError, asyncio.TimeoutError, OSError):
+            dead_list.append(websocket)  # Локальный список — потокобезопасен в рамках TaskGroup
 
     async def close_room(self, room: str, code: int = 1008):
         connections = list(self.active_connections.get(room, []))

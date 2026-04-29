@@ -37,4 +37,4 @@ class Message(Base):
     file_name = Column(String(255), nullable=True)
     mime_type = Column(String(255), nullable=True)
     file_size = Column(Integer, nullable=True)
-    timestamp = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    timestamp = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
