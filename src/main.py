@@ -337,6 +337,19 @@ def enforce_http_rate_limit(request: Request, bucket: str, limit: int, window_se
         )
 
 
+def enforce_http_rate_limit_for_user(
+    request: Request,
+    bucket: str,
+    limit: int,
+    window_seconds: int,
+    user: User,
+):
+    if user.is_admin:
+        return
+
+    enforce_http_rate_limit(request, bucket, limit, window_seconds)
+
+
 def enforce_websocket_rate_limit(websocket: WebSocket, bucket: str, identifier: str, limit: int, window_seconds: int) -> bool:
     retry_after = rate_limiter.hit(bucket, identifier, limit, window_seconds)
     return retry_after is None
@@ -697,9 +710,15 @@ async def create_room(
     payload: CreateRoomRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    username: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit(request, "create_room", 20, 300)
+    enforce_http_rate_limit_for_user(
+        request,
+        "create_room",
+        20,
+        300,
+        current_user,
+    )
 
     room_name = payload.name.strip()
 
@@ -714,7 +733,7 @@ async def create_room(
     room = Room(
         name=room_name,
         password_hash=hash_password(payload.password),
-        created_by=username,
+        created_by=current_user.username,
     )
 
     db.add(room)
@@ -782,7 +801,13 @@ async def delete_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit(request, "delete_room", 10, 300)
+    enforce_http_rate_limit_for_user(
+        request,
+        "delete_room",
+        10,
+        300,
+        current_user,
+    )
 
     result = await db.execute(
         select(Room).where(Room.name == room_name)
@@ -880,7 +905,13 @@ async def join_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit(request, "join_room", 30, 300)
+    enforce_http_rate_limit_for_user(
+        request,
+        "join_room",
+        30,
+        300,
+        current_user
+    )
 
     room_name = payload.room.strip()
 
@@ -995,12 +1026,18 @@ async def upload_attachment(
     text: str = Form(default=""),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit(request, "upload_attachment", 20, 300)
+    enforce_http_rate_limit_for_user(
+        request,
+        "upload_attachment",
+        20,
+        300,
+        current_user,
+    )
 
     username = verify_room_token(room_token, room)
-    if not username or username != current_user:
+    if not username or username != current_user.username:
         raise HTTPException(status_code=403, detail="No access to this room")
 
     if not file.filename:
@@ -1070,6 +1107,18 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     if not username:
         await websocket.close(code=1008)
         return
+    
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(User).where(User.username == username)
+        )
+        user = result.scalar_one_or_none()
+
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+    is_admin = bool(user.is_admin)
 
     await manager.connect(websocket, room)
 
@@ -1088,7 +1137,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                 continue
 
             message_bucket = f"{room}:{username}:{client_ip}"
-            if not enforce_websocket_rate_limit(websocket, "ws_message", message_bucket, 25, 10):
+            if not is_admin and not enforce_websocket_rate_limit(websocket, "ws_message", message_bucket, 25, 10):
                 await websocket.send_json({
                     "type": "system",
                     "text": "Rate limit exceeded",

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Index, Integer, String, Boolean, DateTime
 from datetime import datetime, timezone
 from database import Base
 
@@ -38,3 +38,7 @@ class Message(Base):
     mime_type = Column(String(255), nullable=True)
     file_size = Column(Integer, nullable=True)
     timestamp = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_messages_room_id", "room", "id"),
+    )
