@@ -1057,12 +1057,16 @@ function maybeNotify(payload) {
     if (!payload || payload.type !== "message") return false;
     if (payload.username === currentUser) return false;
 
+    const roomName = payload.room || currentRoom;
     const body = payload.text || payload.file_name || t("attachmentLabel");
 
-    new Notification(t("newMessageTitle", { room: payload.room || currentRoom }), {
+    new Notification(t("newMessageTitle", { room: roomName }), {
         body,
-        tag: `room-${payload.room || currentRoom}`,
+        tag: `room-${roomName}-${payload.id || Date.now()}`,
+        renotify: true,
     });
+
+    return true;
 }
 
 function highlightMentions(text) {
