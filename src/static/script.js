@@ -264,6 +264,7 @@ let currentRoomToken = "";
 
 let ws = null;
 let roomsListCollapsed = false;
+let chatFullscreen = false;
 let allRooms = [];
 let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
@@ -411,6 +412,19 @@ function setInputPlaceholder(id, key) {
     const el = document.getElementById(id);
     if (el) {
         el.placeholder = t(key);
+    }
+}
+
+function toggleChatFullscreen() {
+    chatFullscreen = !chatFullscreen;
+
+    document.body.classList.toggle("chat-fullscreen-mode", chatFullscreen);
+
+    const btn = document.getElementById("fullscreenChatBtn");
+
+    if (btn) {
+        btn.textContent = chatFullscreen ? "⮌" : "⛶";
+        // btn.title = chatFullscreen ? "Вернуть панель" : "Развернуть чат";
     }
 }
 
