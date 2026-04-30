@@ -1,5 +1,4 @@
-src/__pycache__
-src/tests/__pycache__
+__pycache__/
 src/.venv
 src/chat.db
 src/uploads/
