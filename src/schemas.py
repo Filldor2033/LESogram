@@ -75,3 +75,7 @@ class SendMessageRequest(BaseModel):
 
 class EditMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
+
+
+class ReactionRequest(BaseModel):
+    emoji: str

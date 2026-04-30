@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -65,3 +65,42 @@ class Message(Base):
     )
 
     __table_args__ = (Index("ix_messages_room_id", "room", "id"),)
+
+
+class MessageReaction(Base):
+    __tablename__ = "message_reactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    message_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    username: Mapped[str] = mapped_column(
+        String(50),
+        ForeignKey("users.username", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    emoji: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "message_id",
+            "username",
+            "emoji",
+            name="uq_message_reaction_user_emoji",
+        ),
+        Index("ix_message_reactions_message_id", "message_id"),
+    )

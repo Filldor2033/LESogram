@@ -3,11 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user_model, get_db
+from core.config import ALLOWED_REACTIONS
 from core.rate_limit import (enforce_http_rate_limit,
                              enforce_http_rate_limit_for_user)
-from models import Message, User
-from schemas import EditMessageRequest
-from services.messages import normalize_message_text, serialize_message
+from models import Message, MessageReaction, User
+from schemas import EditMessageRequest, ReactionRequest
+from services.messages import get_reactions_for_messages, normalize_message_text, serialize_message
 from services.permissions import can_delete_message
 from services.rooms import require_room_access
 from services.uploads import build_attachment_path
@@ -46,9 +47,20 @@ async def get_messages(
     messages.reverse()
 
     next_before_id = messages[0].id if messages else None
+    
+    reaction_map = await get_reactions_for_messages(
+        db,
+        [message.id for message in messages]
+    )
 
     return {
-        "messages": [serialize_message(message) for message in messages],
+        "messages": [
+            {
+                **serialize_message(message),
+                "reactions": reaction_map.get(message.id, {}),
+            }
+            for message in messages
+        ],
         "has_more": has_more,
         "next_before_id": next_before_id,
     }
@@ -142,6 +154,82 @@ async def edit_message(
         "type": "message_edited",
         "room": message.room,
         "message": serialize_message(message),
+        "timestamp": utc_now().isoformat(),
+    }
+
+    await manager.broadcast_json(payload_data, message.room)
+
+    return payload_data
+
+@router.post("/messages/{message_id}/reactions")
+async def toggle_message_reaction(
+    message_id: int,
+    payload: ReactionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_model),
+):
+    enforce_http_rate_limit_for_user(
+        request,
+        "message_reaction",
+        120,
+        60,
+        current_user,
+    )
+
+    emoji = payload.emoji.strip()
+
+    if emoji not in ALLOWED_REACTIONS:
+        raise HTTPException(status_code=400, detail="Reaction is not allowed")
+
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    result = await db.execute(
+        select(MessageReaction).where(
+            MessageReaction.message_id == message_id,
+            MessageReaction.username == current_user.username,
+            MessageReaction.emoji == emoji,
+        )
+    )
+
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        await db.delete(existing)
+        action = "removed"
+    else:
+        db.add(
+            MessageReaction(
+                message_id=message_id,
+                username=current_user.username,
+                emoji=emoji,
+            )
+        )
+        action = "added"
+
+    await db.commit()
+
+    result = await db.execute(
+        select(MessageReaction).where(MessageReaction.message_id == message_id)
+    )
+
+    reactions = {}
+    for reaction in result.scalars().all():
+        reactions.setdefault(reaction.emoji, [])
+        reactions[reaction.emoji].append(reaction.username)
+
+    payload_data = {
+        "type": "message_reactions_updated",
+        "room": message.room,
+        "message_id": message_id,
+        "reactions": reactions,
+        "action": action,
+        "emoji": emoji,
+        "username": current_user.username,
         "timestamp": utc_now().isoformat(),
     }
 

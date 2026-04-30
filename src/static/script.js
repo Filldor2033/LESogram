@@ -698,6 +698,18 @@ function updateMessageInChat(payload) {
     oldNode.replaceWith(newNode);
 }
 
+function updateMessageReactions(messageId, reactions) {
+    const id = Number(messageId);
+    const payload = messageCache.get(id);
+
+    if (!payload) return;
+
+    payload.reactions = reactions || {};
+    messageCache.set(id, payload);
+
+    updateMessageInChat(payload);
+}
+
 function openMessageContextMenu(event, payload) {
     event.preventDefault();
 
@@ -757,6 +769,31 @@ function contextDelete() {
     }
 
     closeMessageContextMenu();
+}
+
+async function contextReact(emoji) {
+    if (!contextMessage?.id) return;
+
+    try {
+        const res = await fetch(`/messages/${encodeURIComponent(contextMessage.id)}/reactions`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ emoji })
+        });
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            setComposerStatus(getApiErrorMessage(data, "cannotLoadMessages"), true);
+            return;
+        }
+
+        updateMessageReactions(data.message_id, data.reactions);
+    } catch {
+        setComposerStatus(t("cannotLoadMessages"), true);
+    } finally {
+        closeMessageContextMenu();
+    }
 }
 
 function updateTopAdminBadge() {
@@ -955,6 +992,39 @@ function resolveAttachmentUrl(mediaUrl) {
 
 function getMessageType(payload) {
     return payload.content_type || "text";
+}
+
+function buildReactionsNode(payload) {
+    const reactions = payload.reactions || {};
+    const entries = Object.entries(reactions);
+
+    if (!entries.length) return null;
+
+    const box = document.createElement("div");
+    box.className = "msg-reactions";
+
+    for (const [emoji, users] of entries) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "msg-reaction";
+
+        if (users.includes(currentUser)) {
+            btn.classList.add("active");
+        }
+
+        btn.textContent = `${emoji} ${users.length}`;
+        btn.title = users.join(", ");
+
+        btn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            contextMessage = payload;
+            contextReact(emoji);
+        });
+
+        box.appendChild(btn);
+    }
+
+    return box;
 }
 
 function buildAttachmentNode(payload) {
@@ -1223,6 +1293,9 @@ function createMessageNode(payload) {
         // text.textContent = payload.text;
         div.appendChild(text);
     }
+
+    const reactionsNode = buildReactionsNode(payload);
+    if (reactionsNode) div.appendChild(reactionsNode);
 
     const meta = document.createElement("div");
     meta.className = "meta";
@@ -1782,6 +1855,11 @@ function connectWS() {
 
         if (payload.type === "message_edited") {
             updateMessageInChat(payload.message);
+            return;
+        }
+
+        if (payload.type === "message_reactions_updated") {
+            updateMessageReactions(payload.message_id, payload.reactions);
             return;
         }
 

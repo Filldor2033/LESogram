@@ -1,7 +1,9 @@
 from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import MAX_MESSAGE_LENGTH
-from models import Message
+from models import Message, MessageReaction
 
 
 def normalize_message_text(text: str | None, *, allow_empty: bool) -> str:
@@ -27,6 +29,7 @@ def serialize_message(message: Message) -> dict:
         "type": "message",
         "username": message.username,
         "text": message.text or "",
+        "reactions": getattr(message, "reactions_data", {}),
         "room": message.room,
         "timestamp": message.timestamp.isoformat(),
         "content_type": message.content_type or "text",
@@ -41,7 +44,7 @@ def serialize_message(message: Message) -> dict:
 
 
 async def save_message(
-    db,
+    db: AsyncSession,
     *,
     username: str,
     room: str,
@@ -70,3 +73,21 @@ async def save_message(
     await db.refresh(message)
 
     return message
+
+
+async def get_reactions_for_messages(db: AsyncSession, message_ids: list[int]) -> dict[int, dict[str, list[str]]]:
+    if not message_ids:
+        return {}
+
+    result = await db.execute(
+        select(MessageReaction).where(MessageReaction.message_id.in_(message_ids))
+    )
+
+    reactions = {}
+
+    for reaction in result.scalars().all():
+        reactions.setdefault(reaction.message_id, {})
+        reactions[reaction.message_id].setdefault(reaction.emoji, [])
+        reactions[reaction.message_id][reaction.emoji].append(reaction.username)
+
+    return reactions

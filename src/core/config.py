@@ -78,3 +78,5 @@ DANGEROUS_MIME_TYPES = {
     "text/javascript",
     "image/svg+xml",
 }
+
+ALLOWED_REACTIONS = {"👍", "❤️", "😂", "😮", "😢", "🔥"}
