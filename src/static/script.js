@@ -3,6 +3,8 @@ const translations = {
         users: "Users",
         onlineUsers: "Online users",
         noOnlineUsers: "No users online",
+        userCount_one: "{count} user",
+        userCount_many: "{count} users",
         reply: "Reply",
         close: "Close",
         edit: "Edit",
@@ -121,6 +123,9 @@ const translations = {
         users: "Участники",
         onlineUsers: "Пользователи онлайн",
         noOnlineUsers: "Нет пользователей онлайн",
+        userCount_one: "{count} пользователь",
+        userCount_few: "{count} пользователя",
+        userCount_many: "{count} пользователей",
         reply: "Ответить",
         close: "Закрыть",
         edit: "Редактировать",
@@ -346,12 +351,34 @@ function pluralizeRu(count, one, few, many) {
     return many;
 }
 
+function formatUserCount(count) {
+    if (currentLanguage === "ru") {
+        return pluralizeRu(
+            count,
+            t("userCount_one", { count }),
+            t("userCount_few", { count }),
+            t("userCount_many", { count })
+        );
+    }
+
+    return count === 1
+        ? t("userCount_one", { count })
+        : t("userCount_many", { count });
+}
+
 function formatRoomCount(count) {
     if (currentLanguage === "ru") {
-        const form = pluralizeRu(count, t("roomCount_one", { count }), t("roomCount_few", { count }), t("roomCount_many", { count }));
-        return form;
+        return pluralizeRu(
+            count,
+            t("roomCount_one", { count }),
+            t("roomCount_few", { count }),
+            t("roomCount_many", { count })
+        );
     }
-    return count === 1 ? t("roomCount_one", { count }) : t("roomCount_many", { count });
+
+    return count === 1
+        ? t("roomCount_one", { count })
+        : t("roomCount_many", { count });
 }
 
 function scrollChatToBottom() {
@@ -828,6 +855,12 @@ function applyTranslations() {
     const attachBtn = document.getElementById("pickAttachmentBtn");
     if (attachBtn) {
         attachBtn.title = t("attachmentLabel");
+    }
+
+    const usersPopupSubtitle = document.getElementById("usersPopupSubtitle");
+    if (usersPopupSubtitle) {
+        const currentCount = document.querySelectorAll("#usersList .user-item").length;
+        usersPopupSubtitle.textContent = formatUserCount(currentCount);
     }
 
     setInputPlaceholder("username", "usernamePlaceholder");
@@ -2031,10 +2064,16 @@ async function loadRoomUsers() {
 
     const list = document.getElementById("usersList");
     const subtitle = document.getElementById("usersPopupSubtitle");
+    const title = document.getElementById("usersPopupTitle");
 
     if (!list || !subtitle) return;
 
+    if (title) {
+        title.textContent = t("onlineUsers");
+    }
+
     list.innerHTML = `<div class="users-loading">...</div>`;
+    subtitle.textContent = formatUserCount(0);
 
     try {
         const res = await fetch(
@@ -2045,15 +2084,15 @@ async function loadRoomUsers() {
 
         if (!res.ok) {
             list.innerHTML = `<div class="users-empty">${getApiErrorMessage(data, "cannotLoadRooms")}</div>`;
-            subtitle.textContent = formatRoomCount(0);
+            subtitle.textContent = formatUserCount(0);
             return;
         }
 
-        subtitle.textContent = formatRoomCount(data.count || 0);
+        subtitle.textContent = formatUserCount(data.count || 0);
         renderUsersList(data.users || []);
     } catch {
         list.innerHTML = `<div class="users-empty">${t("cannotLoadRooms")}</div>`;
-        subtitle.textContent = formatRoomCount(0);
+        subtitle.textContent = formatUserCount(0);
     }
 }
 
