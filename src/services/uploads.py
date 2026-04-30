@@ -24,8 +24,8 @@ def determine_upload_content_type(filename: str, mime_type: str | None) -> str:
     ).lower()
     ext = Path(filename).suffix.lower()
 
-    if mime == "image/gif" or ext == ".gif":
-        raise HTTPException(status_code=400, detail="GIF uploads are disabled")
+    # if mime == "image/gif" or ext == ".gif":
+    #     raise HTTPException(status_code=400, detail="GIF uploads are disabled")
 
     if ext in DANGEROUS_FILE_EXTENSIONS or mime in DANGEROUS_MIME_TYPES:
         raise HTTPException(status_code=400, detail="File type is not allowed")

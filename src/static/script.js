@@ -32,8 +32,6 @@ const translations = {
         roomListSubtitle: "Browse and join",
         hideList: "Hide list",
         showList: "Show list",
-        notificationsOn: "Disable notifications",
-        notificationsOff: "Enable notifications",
         notificationsEnabled: "Notifications enabled",
         newMessageTitle: "New message in {room}",
         roomSearchPlaceholder: "Search by room name...",
@@ -152,8 +150,6 @@ const translations = {
         roomListSubtitle: "Выберите и подключитесь",
         hideList: "Скрыть",
         showList: "Показать",
-        notificationsOn: "Выключить уведомления",
-        notificationsOff: "Включить уведомления",
         notificationsEnabled: "Уведомления включены",
         newMessageTitle: "Новое сообщение в {room}",
         roomSearchPlaceholder: "Поиск по названию комнаты...",
@@ -418,6 +414,13 @@ function setInputPlaceholder(id, key) {
     }
 }
 
+function getFileIcon(type) {
+    if (type.includes("pdf")) return "📄";
+    if (type.includes("zip") || type.includes("rar")) return "🗜️";
+    if (type.includes("text")) return "📝";
+    return "📎";
+}
+
 function setPendingAttachment(file) {
     if (!file || !ensureRoomSelected()) return;
 
@@ -452,7 +455,16 @@ function setPendingAttachment(file) {
 
         media.appendChild(video);
     } else {
-        media.textContent = "📎";
+        const fileBox = document.createElement("div");
+        fileBox.className = "upload-file-preview";
+
+        const icon = document.createElement("div");
+        icon.className = "upload-file-icon";
+        icon.textContent = getFileIcon(file.type);
+
+        fileBox.appendChild(icon);
+
+        media.appendChild(fileBox);
     }
 
     preview.classList.remove("hidden");
@@ -768,6 +780,8 @@ function refreshRuntimeTranslations() {
     document.querySelectorAll(".file-link[data-i18n-key='download']").forEach((node) => {
         node.textContent = t("download");
     });
+
+    document.getElementById("cancelPendingAttachment").textContent = t("cancel")
 }
 
 function applyTranslations() {
@@ -787,18 +801,20 @@ function applyTranslations() {
     setButtonText("refreshRoomsBtn", "refreshRooms");
     setButtonText("resetFiltersBtn", "resetFilters");
     setButtonText("leaveChatBtn", "leaveChat");
-    setButtonText("pickMediaBtn", "pickMedia");
-    setButtonText("pickFileBtn", "pickFile");
     setButtonText("sendBtn", "send");
     setButtonText("contextReplyBtn", "reply");
     setButtonText("contextEditBtn", "edit");
     setButtonText("contextDeleteBtn", "delete");
     setButtonText("roomUsersBtn", "users");
-    setButtonText("notificationsBtn", "enableNotifications");
 
     document.querySelectorAll("[data-i18n-key]").forEach((node) => {
         node.textContent = t(node.dataset.i18nKey);
     });
+
+    const attachBtn = document.getElementById("pickAttachmentBtn");
+    if (attachBtn) {
+        attachBtn.title = t("attachmentLabel");
+    }
 
     setInputPlaceholder("username", "usernamePlaceholder");
     setInputPlaceholder("password", "passwordPlaceholder");
@@ -987,11 +1003,11 @@ function updateNotificationsButton() {
     if (!btn) return;
 
     if (notificationsEnabled) {
-        btn.textContent = t("notificationsOn");
         btn.classList.remove("secondary");
+        btn.textContent = "🔔";
     } else {
-        btn.textContent = t("notificationsOff");
         btn.classList.add("secondary");
+        btn.textContent = "🔕";
     }
 }
 
@@ -1806,16 +1822,16 @@ function handleComposerKey(event) {
 
     if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        if (pendingAttachmentFile) {
-            sendPendingAttachment();
-        } else {
-            sendMessage();
-        }
+        sendMessage();
     }
 }
 
 function sendMessage() {
     if (!ensureRoomSelected()) return;
+
+    if (pendingAttachmentFile) {
+        sendPendingAttachment();
+    }
 
     const input = document.getElementById("message");
     const text = input.value.trim();
@@ -1840,14 +1856,9 @@ function sendMessage() {
     setComposerStatus("");
 }
 
-function pickMedia() {
+function pickAttachment() {
     if (!ensureRoomSelected()) return;
-    document.getElementById("mediaInput").click();
-}
-
-function pickFile() {
-    if (!ensureRoomSelected()) return;
-    document.getElementById("fileInput").click();
+    document.getElementById("attachmentInput").click();
 }
 
 function shouldAppendHttpResponse() {
@@ -2147,52 +2158,6 @@ async function handleRoomDeleted(payload) {
     resetActiveRoomState();
     setStatus("roomStatus", ownDeletion ? t("deletedRoom", { room: deletedRoom }) : t("roomDeletedByOwner", { room: deletedRoom }));
     await loadRooms();
-}
-
-async function handleAttachmentSelect(event) {
-    const input = event.target;
-    const file = input.files?.[0];
-    input.value = "";
-
-    if (!file || !ensureRoomSelected()) return;
-
-    const caption = document.getElementById("message").value.trim();
-    const formData = new FormData();
-    formData.append("room_token", currentRoomToken);
-    formData.append("text", caption);
-    formData.append("file", file);
-
-    if (replyTarget?.id) {
-        formData.append("reply_to_id", String(replyTarget.id));
-    }
-
-    setComposerStatus(t("uploadingFile", { file: file.name }));
-
-    try {
-        const res = await fetch(`/rooms/${encodeURIComponent(currentRoom)}/attachments`, {
-            method: "POST",
-            headers: authHeaders({ json: false }),
-            body: formData
-        });
-
-        const data = await safeJson(res);
-
-        if (!res.ok) {
-            setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
-            return;
-        }
-
-        clearReplyTarget();
-
-        if (shouldAppendHttpResponse()) {
-            addMessage(data);
-        }
-
-        document.getElementById("message").value = "";
-        setComposerStatus(t("fileSent", { file: file.name }));
-    } catch (error) {
-        setComposerStatus(t("uploadFailed"), true);
-    }
 }
 
 async function leaveChat() {

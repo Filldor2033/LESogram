@@ -13,6 +13,7 @@ ALLOWED_IMAGE_MIME_TYPES = {
     "image/png",
     "image/webp",
     "image/bmp",
+    "image/gif"
 }
 
 ALLOWED_VIDEO_MIME_TYPES = {

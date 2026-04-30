@@ -124,6 +124,7 @@
                             chat</button>
                         <button id="notificationsBtn" class="secondary small-btn toggle-btn"
                             onclick="toggleNotifications()">
+
                         </button>
                     </div>
                 </div>
@@ -145,8 +146,7 @@
             <div id="typingIndicator" class="typing-indicator hidden"></div>
             <div class="composer">
                 <div class="composer-tools">
-                    <button id="pickMediaBtn" class="secondary tool-btn" onclick="pickMedia()">Photo or video</button>
-                    <button id="pickFileBtn" class="secondary tool-btn" onclick="pickFile()">File</button>
+
                 </div>
                 <div id="replyPreview" class="reply-preview hidden">
                     <div>
@@ -165,21 +165,22 @@
                     </div>
 
                     <div class="upload-preview-actions">
-                        <button type="button" class="small-btn" onclick="sendPendingAttachment()">Send</button>
-                        <button type="button" class="secondary small-btn"
+                        <button id="cancelPendingAttachment" type="button" class="secondary small-btn"
                             onclick="clearPendingAttachment()">Cancel</button>
                     </div>
                 </div>
                 <div class="input-row">
+                    <button id="pickAttachmentBtn" class="secondary tool-btn attach-btn" style="max-width: 40px;"
+                        onclick="pickAttachment()" title="Attach file">
+                        📎
+                    </button>
                     <input id="message" placeholder="Type a message or add a caption..."
                         onkeydown="handleComposerKey(event)"
                         oninput="handleMessageInputTyping(); handleComposerInput();" />
                     <button id="sendBtn" style="width:120px" onclick="sendMessage()">Send</button>
                 </div>
                 <div id="composerStatus" class="status composer-status"></div>
-                <input id="mediaInput" class="hidden" type="file" accept="image/*,video/*"
-                    onchange="handleAttachmentSelect(event)" />
-                <input id="fileInput" class="hidden" type="file" onchange="handleAttachmentSelect(event)" />
+                <input id="attachmentInput" class="hidden" type="file" onchange="handleAttachmentSelect(event)" />
             </div>
         </div>
     </div>

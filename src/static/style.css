@@ -160,6 +160,23 @@ select {
     border-top: 1px solid rgba(148, 163, 184, 0.06);
 }
 
+.attach-btn {
+    width: 44px;
+    min-width: 44px;
+    font-size: 20px;
+    padding: 10px 0;
+}
+
+.upload-file-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.upload-file-icon {
+    font-size: 24px;
+}
+
 .typing-indicator::after {
     content: "";
     display: inline-block;
