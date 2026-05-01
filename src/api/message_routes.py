@@ -31,7 +31,7 @@ async def get_messages(
     limit: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    enforce_http_rate_limit(request, "get_messages", 120, 60)
+    await enforce_http_rate_limit(request, "get_messages", 120, 60)
 
     username = await require_room_access(room, room_token, db)
     del username
@@ -76,7 +76,7 @@ async def delete_message(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit(request, "delete_message", 60, 60)
+    await enforce_http_rate_limit(request, "delete_message", 60, 60)
 
     if not can_delete_message(current_user):
         raise HTTPException(status_code=403, detail="Only admins can delete messages")
@@ -125,7 +125,7 @@ async def edit_message(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit_for_user(
+    await enforce_http_rate_limit_for_user(
         request,
         "edit_message",
         60,
@@ -173,7 +173,7 @@ async def toggle_message_reaction(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit_for_user(
+    await enforce_http_rate_limit_for_user(
         request,
         "message_reaction",
         120,

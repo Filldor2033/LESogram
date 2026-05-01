@@ -1,7 +1,7 @@
 import asyncio
+import hashlib
 import time
 from collections import defaultdict, deque
-from threading import Lock
 from typing import Optional
 
 from fastapi import HTTPException, Request, WebSocket
@@ -14,18 +14,22 @@ class SlidingWindowRateLimiter:
     def __init__(self, cleanup_interval: int = 60, fallback_window: int = 300):
         self.events: dict[str, deque[float]] = defaultdict(deque)
         self.key_windows: dict[str, int] = {}
-        self.lock = Lock()
+        self.lock = asyncio.Lock()
         self.cleanup_interval = cleanup_interval
         self.fallback_window = fallback_window
         self._cleanup_task: Optional[asyncio.Task] = None
 
-    def hit(
-        self, bucket: str, identifier: str, limit: int, window_seconds: int
+    async def hit(
+        self,
+        bucket: str,
+        identifier: str,
+        limit: int,
+        window_seconds: int,
     ) -> int | None:
         now = time.monotonic()
         key = f"{bucket}:{identifier}"
 
-        with self.lock:
+        async with self.lock:
             self.key_windows[key] = window_seconds
             entries = self.events[key]
 
@@ -44,18 +48,22 @@ class SlidingWindowRateLimiter:
         while True:
             try:
                 await asyncio.sleep(self.cleanup_interval)
-                self._cleanup_expired()
+                await self._cleanup_expired()
             except asyncio.CancelledError:
                 break
 
-    def _cleanup_expired(self):
+    async def _cleanup_expired(self):
         now = time.monotonic()
-        with self.lock:
+
+        async with self.lock:
             keys_to_remove = []
+
             for key, entries in self.events.items():
                 window = self.key_windows.get(key, self.fallback_window)
+
                 while entries and now - entries[0] > window:
                     entries.popleft()
+
                 if not entries:
                     keys_to_remove.append(key)
 
@@ -70,14 +78,17 @@ class SlidingWindowRateLimiter:
     async def stop_cleanup(self):
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
+
             try:
                 await self._cleanup_task
             except asyncio.CancelledError:
                 pass
+
             self._cleanup_task = None
 
 
 rate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
+duplicate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
 
 
 def get_client_ip_from_request(request: Request) -> str:
@@ -85,19 +96,22 @@ def get_client_ip_from_request(request: Request) -> str:
 
 
 def get_client_ip_from_websocket(websocket: WebSocket) -> str:
-    return (
-        websocket.client.host
-        if websocket.client and websocket.client.host
-        else "unknown"
-    )
+    return websocket.client.host if websocket.client and websocket.client.host else "unknown"
 
 
-def enforce_http_rate_limit(
-    request: Request, bucket: str, limit: int, window_seconds: int
+async def enforce_http_rate_limit(
+    request: Request,
+    bucket: str,
+    limit: int,
+    window_seconds: int,
 ):
-    retry_after = rate_limiter.hit(
-        bucket, get_client_ip_from_request(request), limit, window_seconds
+    retry_after = await rate_limiter.hit(
+        bucket,
+        get_client_ip_from_request(request),
+        limit,
+        window_seconds,
     )
+
     if retry_after is not None:
         raise HTTPException(
             status_code=429,
@@ -105,7 +119,7 @@ def enforce_http_rate_limit(
         )
 
 
-def enforce_http_rate_limit_for_user(
+async def enforce_http_rate_limit_for_user(
     request: Request,
     bucket: str,
     limit: int,
@@ -115,11 +129,56 @@ def enforce_http_rate_limit_for_user(
     if can_skip_rate_limit(user):
         return
 
-    enforce_http_rate_limit(request, bucket, limit, window_seconds)
+    await enforce_http_rate_limit(request, bucket, limit, window_seconds)
 
 
-def enforce_websocket_rate_limit(
-    websocket: WebSocket, bucket: str, identifier: str, limit: int, window_seconds: int
+async def check_websocket_rate_limit(
+    bucket: str,
+    identifier: str,
+    limit: int,
+    window_seconds: int,
+) -> int | None:
+    return await rate_limiter.hit(bucket, identifier, limit, window_seconds)
+
+
+async def enforce_websocket_rate_limit(
+    websocket: WebSocket,
+    bucket: str,
+    identifier: str,
+    limit: int,
+    window_seconds: int,
 ) -> bool:
-    retry_after = rate_limiter.hit(bucket, identifier, limit, window_seconds)
+    retry_after = await check_websocket_rate_limit(
+        bucket,
+        identifier,
+        limit,
+        window_seconds,
+    )
+
     return retry_after is None
+
+
+def normalize_message_for_spam(text: str) -> str:
+    return " ".join(text.lower().strip().split())
+
+
+def message_fingerprint(text: str) -> str:
+    normalized = normalize_message_for_spam(text)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+async def check_duplicate_message_limit(
+    room: str,
+    username: str,
+    text: str,
+    limit: int = 2,
+    window_seconds: int = 30,
+) -> int | None:
+    fingerprint = message_fingerprint(text)
+
+    return await duplicate_limiter.hit(
+        "duplicate_message",
+        f"{room}:{username}:{fingerprint}",
+        limit,
+        window_seconds,
+    )

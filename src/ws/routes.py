@@ -6,7 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from core.config import HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, MAX_MESSAGE_LENGTH
-from core.rate_limit import enforce_websocket_rate_limit, get_client_ip_from_websocket
+from core.rate_limit import check_duplicate_message_limit, check_websocket_rate_limit, enforce_websocket_rate_limit, get_client_ip_from_websocket
 from database import SessionLocal
 from models import Room, User
 from services.messages import save_message, serialize_message
@@ -56,7 +56,14 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         return
 
     client_ip = get_client_ip_from_websocket(websocket)
-    if not enforce_websocket_rate_limit(websocket, "ws_connect", client_ip, 25, 60):
+    connect_retry_after = await check_websocket_rate_limit(
+        "ws_connect",
+        client_ip,
+        25,
+        60,
+    )
+
+    if connect_retry_after is not None:
         await websocket.close(code=1013)
         return
 
@@ -110,6 +117,16 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                 continue
 
             if event_type == "typing":
+                typing_retry_after = await check_websocket_rate_limit(
+                    "ws_typing",
+                    f"{room}:{username}:{client_ip}",
+                    20,
+                    10,
+                )
+
+                if not is_admin and typing_retry_after is not None:
+                    continue
+
                 await manager.broadcast_json(
                     {
                         "type": "typing",
@@ -136,9 +153,36 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                 continue
 
             message_bucket = f"{room}:{username}:{client_ip}"
-            if not is_admin and not enforce_websocket_rate_limit(
-                websocket, "ws_message", message_bucket, 25, 10
-            ):
+
+            burst_retry_after = await check_websocket_rate_limit(
+                "ws_message_burst",
+                message_bucket,
+                5,
+                3,
+            )
+
+            if not is_admin and burst_retry_after is not None:
+                await websocket.send_json(
+                    {
+                        "type": "system",
+                        "text": "Too many messages too quickly",
+                        "room": room,
+                        "timestamp": utc_now().isoformat(),
+                        "system_event": "rate_limited",
+                        "system_actor": username,
+                        "retry_after": burst_retry_after,
+                    }
+                )
+                continue
+
+            message_retry_after = await check_websocket_rate_limit(
+                "ws_message",
+                message_bucket,
+                25,
+                10,
+            )
+
+            if not is_admin and message_retry_after is not None:
                 await websocket.send_json(
                     {
                         "type": "system",
@@ -147,6 +191,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
                         "timestamp": utc_now().isoformat(),
                         "system_event": "rate_limited",
                         "system_actor": username,
+                        "retry_after": message_retry_after,
                     }
                 )
                 continue

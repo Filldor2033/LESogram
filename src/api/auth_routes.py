@@ -27,7 +27,7 @@ async def register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    enforce_http_rate_limit(request, "register", 8, 60)
+    await enforce_http_rate_limit(request, "register", 8, 60)
 
     username = payload.username.strip()
 
@@ -56,7 +56,7 @@ async def login(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    enforce_http_rate_limit(request, "login", 10, 60)
+    await enforce_http_rate_limit(request, "login", 10, 60)
 
     username = payload.username.strip()
 

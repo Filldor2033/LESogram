@@ -31,7 +31,7 @@ async def get_attachment(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    enforce_http_rate_limit(request, "get_attachment", 240, 60)
+    await enforce_http_rate_limit(request, "get_attachment", 240, 60)
 
     result = await db.execute(select(Message).where(Message.id == message_id))
     message = result.scalar_one_or_none()
@@ -74,7 +74,7 @@ async def upload_attachment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit_for_user(
+    await enforce_http_rate_limit_for_user(
         request,
         "upload_attachment",
         20,

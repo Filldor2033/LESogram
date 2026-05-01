@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -29,15 +29,16 @@ def test_get_client_ip_from_websocket_with_none_client():
     assert ip == "unknown"
 
 
-def test_enforce_http_rate_limit_triggers(client, monkeypatch):
-    mock_hit = Mock(return_value=30)
+@pytest.mark.asyncio
+async def test_enforce_http_rate_limit_triggers(client, monkeypatch):
+    mock_hit = AsyncMock(return_value=30)
     monkeypatch.setattr(rate_limiter, "hit", mock_hit)
 
     request = Mock()
     request.client = Mock(host="127.0.0.1")
 
     with pytest.raises(HTTPException) as exc:
-        enforce_http_rate_limit(
+        await enforce_http_rate_limit(
             request,
             "test_bucket",
             limit=1,
@@ -46,4 +47,10 @@ def test_enforce_http_rate_limit_triggers(client, monkeypatch):
 
     assert exc.value.status_code == 429
     assert "Retry in 30 seconds" in exc.value.detail
-    mock_hit.assert_called_once()
+
+    mock_hit.assert_awaited_once_with(
+        "test_bucket",
+        "127.0.0.1",
+        1,
+        60,
+    )

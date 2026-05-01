@@ -24,7 +24,7 @@ async def list_rooms(
     username: str = Depends(get_current_user),
 ):
     del username
-    enforce_http_rate_limit(request, "list_rooms", 120, 60)
+    await enforce_http_rate_limit(request, "list_rooms", 120, 60)
 
     result = await db.execute(select(Room).order_by(Room.created_at.desc()))
     rooms = result.scalars().all()
@@ -47,7 +47,7 @@ async def create_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit_for_user(
+    await enforce_http_rate_limit_for_user(
         request,
         "create_room",
         20,
@@ -82,7 +82,7 @@ async def join_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit_for_user(request, "join_room", 30, 300, current_user)
+    await enforce_http_rate_limit_for_user(request, "join_room", 30, 300, current_user)
 
     room_name = payload.room.strip()
 
@@ -118,7 +118,7 @@ async def list_room_users(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    enforce_http_rate_limit(request, "list_room_users", 120, 60)
+    await enforce_http_rate_limit(request, "list_room_users", 120, 60)
 
     username = await require_room_access(room, room_token, db)
     del username
@@ -163,7 +163,7 @@ async def delete_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
 ):
-    enforce_http_rate_limit_for_user(
+    await enforce_http_rate_limit_for_user(
         request,
         "delete_room",
         10,
