@@ -115,6 +115,16 @@ export function connectWS() {
 
         if (payload.room && payload.room !== state.currentRoom) return;
 
+        if (payload.type === "ping") {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "pong",
+                    timestamp: new Date().toISOString(),
+                }));
+            }
+            return;
+        }
+
         if (
             payload.type === "system" &&
             payload.system_event === "room_deleted" &&

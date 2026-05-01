@@ -1,9 +1,11 @@
+import asyncio
+import contextlib
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from core.config import MAX_MESSAGE_LENGTH
+from core.config import HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, MAX_MESSAGE_LENGTH
 from core.rate_limit import enforce_websocket_rate_limit, get_client_ip_from_websocket
 from database import SessionLocal
 from models import Room, User
@@ -25,6 +27,26 @@ def websocket_origin_allowed(websocket: WebSocket) -> bool:
 
     parsed = urlparse(origin)
     return parsed.netloc.lower() == host.lower()
+
+
+async def heartbeat(websocket: WebSocket):
+    while True:
+        await asyncio.sleep(HEARTBEAT_INTERVAL)
+
+        last_seen = getattr(websocket.state, "last_seen", None)
+        now = utc_now()
+
+        if last_seen and (now - last_seen).total_seconds() > HEARTBEAT_TIMEOUT:
+            await websocket.close(code=1001)
+            return
+
+        ok = await manager._send_safe(websocket, {
+            "type": "ping",
+            "timestamp": now.isoformat(),
+        })
+
+        if not ok:
+            return
 
 
 @router.websocket("/ws/{room}")
@@ -65,6 +87,9 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
 
     await manager.connect(websocket, room)
     websocket.state.username = username
+    websocket.state.last_seen = utc_now()
+    
+    heartbeat_task = asyncio.create_task(heartbeat(websocket))
 
     was_offline = room_members[room][username] == 0
     room_members[room][username] += 1
@@ -77,8 +102,12 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     try:
         while True:
             data = await websocket.receive_json()
+            websocket.state.last_seen = utc_now()
 
             event_type = data.get("type")
+            
+            if event_type == "pong":
+                continue
 
             if event_type == "typing":
                 await manager.broadcast_json(
@@ -162,6 +191,11 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     except Exception as exc:
         print("WebSocket error:", repr(exc))
     finally:
+        heartbeat_task.cancel()
+        
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat_task
+        
         manager.disconnect(websocket, room)
 
         went_offline = False
