@@ -4,11 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user_model, get_db
 from core.config import ALLOWED_REACTIONS
-from core.rate_limit import (enforce_http_rate_limit,
-                             enforce_http_rate_limit_for_user)
+from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from models import Message, MessageReaction, User
 from schemas import EditMessageRequest, ReactionRequest
-from services.messages import get_reactions_for_messages, normalize_message_text, serialize_message
+from services.messages import (
+    Reactions,
+    get_reactions_for_messages,
+    normalize_message_text,
+    serialize_message,
+)
 from services.permissions import can_delete_message
 from services.rooms import require_room_access
 from services.uploads import build_attachment_path
@@ -47,10 +51,9 @@ async def get_messages(
     messages.reverse()
 
     next_before_id = messages[0].id if messages else None
-    
+
     reaction_map = await get_reactions_for_messages(
-        db,
-        [message.id for message in messages]
+        db, [message.id for message in messages]
     )
 
     return {
@@ -161,6 +164,7 @@ async def edit_message(
 
     return payload_data
 
+
 @router.post("/messages/{message_id}/reactions")
 async def toggle_message_reaction(
     message_id: int,
@@ -217,7 +221,7 @@ async def toggle_message_reaction(
         select(MessageReaction).where(MessageReaction.message_id == message_id)
     )
 
-    reactions = {}
+    reactions: Reactions = {}
     for reaction in result.scalars().all():
         reactions.setdefault(reaction.emoji, [])
         reactions[reaction.emoji].append(reaction.username)

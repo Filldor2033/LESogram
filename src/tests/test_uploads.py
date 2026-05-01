@@ -2,8 +2,11 @@ import pytest
 from fastapi import HTTPException
 
 import services.uploads as uploads_module
-from services.uploads import (build_attachment_path,
-                              determine_upload_content_type, sanitize_filename)
+from services.uploads import (
+    build_attachment_path,
+    determine_upload_content_type,
+    sanitize_filename,
+)
 from tests.helpers import create_room_and_join, register
 
 

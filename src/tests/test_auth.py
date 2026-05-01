@@ -2,8 +2,14 @@ from datetime import datetime, timedelta, timezone
 
 from jose import jwt
 
-from auth import (ALGORITHM, SECRET_KEY, create_access_token, hash_password,
-                  verify_password, verify_token)
+from auth import (
+    ALGORITHM,
+    SECRET_KEY,
+    create_access_token,
+    hash_password,
+    verify_password,
+    verify_token,
+)
 from tests.helpers import register
 
 

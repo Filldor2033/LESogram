@@ -75,7 +75,12 @@ async def save_message(
     return message
 
 
-async def get_reactions_for_messages(db: AsyncSession, message_ids: list[int]) -> dict[int, dict[str, list[str]]]:
+Reactions = dict[int, dict[str, list[str]]]
+
+
+async def get_reactions_for_messages(
+    db: AsyncSession, message_ids: list[int]
+) -> Reactions:
     if not message_ids:
         return {}
 
@@ -83,7 +88,7 @@ async def get_reactions_for_messages(db: AsyncSession, message_ids: list[int]) -
         select(MessageReaction).where(MessageReaction.message_id.in_(message_ids))
     )
 
-    reactions = {}
+    reactions: Reactions = {}
 
     for reaction in result.scalars().all():
         reactions.setdefault(reaction.message_id, {})

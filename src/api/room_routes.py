@@ -6,13 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_current_user_model, get_db
 from auth import create_access_token, hash_password, verify_password
-from core.rate_limit import (enforce_http_rate_limit,
-                             enforce_http_rate_limit_for_user)
+from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from models import Message, Room, User
 from schemas import CreateRoomRequest, JoinRoomRequest
 from services.permissions import can_delete_room, can_skip_room_password
-from services.rooms import (build_system_payload, require_room_access,
-                            room_members)
+from services.rooms import build_system_payload, require_room_access, room_members
 from services.uploads import remove_room_uploads
 from ws.manager import manager
 

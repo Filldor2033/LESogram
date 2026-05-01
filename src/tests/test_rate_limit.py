@@ -3,9 +3,12 @@ from unittest.mock import Mock
 import pytest
 from fastapi import HTTPException
 
-from core.rate_limit import (enforce_http_rate_limit,
-                             get_client_ip_from_request,
-                             get_client_ip_from_websocket, rate_limiter)
+from core.rate_limit import (
+    enforce_http_rate_limit,
+    get_client_ip_from_request,
+    get_client_ip_from_websocket,
+    rate_limiter,
+)
 
 
 def test_get_client_ip_from_request_with_none_client():
