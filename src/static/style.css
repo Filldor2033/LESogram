@@ -1287,6 +1287,39 @@ body {
         bottom: 0;
         z-index: 10;
     }
+
+    .container {
+        min-height: auto;
+    }
+
+    .panel,
+    .chat-panel {
+        border-radius: 18px;
+        overflow: hidden;
+    }
+
+    .header {
+        border-radius: 0;
+    }
+
+    .section-block,
+    .room-item,
+    .chat-empty,
+    .users-card {
+        border-radius: 16px;
+    }
+
+    .composer {
+        border-radius: 0;
+    }
+
+    .users-popup {
+        position: fixed;
+        top: 90px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
 }
 
 @media (max-width: 600px) {
