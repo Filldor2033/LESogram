@@ -3,7 +3,16 @@ const translations = {
         users: "Users",
         onlineUsers: "Online users",
         noOnlineUsers: "No users online",
+        userCount_one: "{count} user",
+        userCount_many: "{count} users",
+        reply: "Reply",
         close: "Close",
+        edit: "Edit",
+        save: "Save",
+        cancel: "Cancel",
+        edited: "edited",
+        cannotEditMessage: "Cannot edit message",
+        onlyAuthorCanEdit: "Only the author can edit this message",
         appTitle: "LESogram",
         brandSubtitle: "Fast rooms, live messages, simple sharing",
         authTitle: "Account",
@@ -14,6 +23,8 @@ const translations = {
         logout: "Exit",
         adminBadge: "Admin",
         youBadge: "you",
+        mentionTitle: "You were mentioned",
+        mentionStatus: "@{user} mentioned you",
         onlineBadge: "online",
         createRoomTitle: "Create Room",
         newRoomNamePlaceholder: "New room name",
@@ -23,6 +34,8 @@ const translations = {
         roomListSubtitle: "Browse and join",
         hideList: "Hide list",
         showList: "Show list",
+        notificationsEnabled: "Notifications enabled",
+        newMessageTitle: "New message in {room}",
         roomSearchPlaceholder: "Search by room name...",
         creatorSearchPlaceholder: "Search by creator...",
         allRooms: "All rooms",
@@ -83,6 +96,8 @@ const translations = {
         leftRoom: "You left the room",
         systemJoined: "{user} joined",
         systemLeft: "{user} left",
+        typingOne: "{user} is typing",
+        typingMany: "{users} are typing",
         systemRoomDeleted: "Room was deleted by {user}",
         systemRateLimited: "Too many actions. Please slow down.",
         apiMissingToken: "Missing token",
@@ -108,7 +123,17 @@ const translations = {
         users: "Участники",
         onlineUsers: "Пользователи онлайн",
         noOnlineUsers: "Нет пользователей онлайн",
+        userCount_one: "{count} пользователь",
+        userCount_few: "{count} пользователя",
+        userCount_many: "{count} пользователей",
+        reply: "Ответить",
         close: "Закрыть",
+        edit: "Редактировать",
+        save: "Сохранить",
+        cancel: "Отмена",
+        edited: "изменено",
+        cannotEditMessage: "Не удалось изменить сообщение",
+        onlyAuthorCanEdit: "Редактировать сообщение может только автор",
         appTitle: "LESogram",
         brandSubtitle: "Быстрые комнаты, живые сообщения и удобная отправка файлов",
         authTitle: "Аккаунт",
@@ -119,6 +144,8 @@ const translations = {
         logout: "Выйти",
         adminBadge: "Админ",
         youBadge: "вы",
+        mentionTitle: "Вас упомянули",
+        mentionStatus: "@{user} упомянул(а) вас",
         onlineBadge: "онлайн",
         createRoomTitle: "Создать комнату",
         newRoomNamePlaceholder: "Название новой комнаты",
@@ -128,6 +155,8 @@ const translations = {
         roomListSubtitle: "Выберите и подключитесь",
         hideList: "Скрыть",
         showList: "Показать",
+        notificationsEnabled: "Уведомления включены",
+        newMessageTitle: "Новое сообщение в {room}",
         roomSearchPlaceholder: "Поиск по названию комнаты...",
         creatorSearchPlaceholder: "Поиск по создателю...",
         allRooms: "Все комнаты",
@@ -189,6 +218,8 @@ const translations = {
         leftRoom: "Вы вышли из комнаты",
         systemJoined: "{user} вошёл(а)",
         systemLeft: "{user} вышел(а)",
+        typingOne: "{user} печатает",
+        typingMany: "{users} печатают",
         systemRoomDeleted: "Комната удалена пользователем {user}",
         systemRateLimited: "Слишком много действий. Немного подождите.",
         apiMissingToken: "Токен отсутствует",
@@ -227,20 +258,44 @@ const API_DETAIL_MAP = {
     "File type is not allowed": "apiFileTypeNotAllowed",
     "GIF uploads are disabled": "apiGifDisabled",
     "Attachment is empty": "apiAttachmentEmpty",
-    "Message cannot be empty": "apiMessageEmpty"
+    "Message cannot be empty": "apiMessageEmpty",
+    "Only the author can edit this message": "onlyAuthorCanEdit",
 };
 
 let token = localStorage.getItem("token") || "";
 let currentUser = localStorage.getItem("username") || "";
 let currentRoom = "";
 let currentRoomToken = "";
+
 let ws = null;
 let roomsListCollapsed = false;
+let chatFullscreen = false;
 let allRooms = [];
 let currentLanguage = getInitialLanguage();
 let suppressNextWsCloseStatus = false;
 let roomsRefreshTimer = null;
 let currentIsAdmin = localStorage.getItem("is_admin") === "1";
+let replyTarget = null;
+let contextMessage = null;
+let longPressTimer = null;
+
+let typingUsers = new Map();
+let typingStopTimer = null;
+let typingRenderTimer = null;
+
+let messagesNextBeforeId = null;
+let messagesHasMore = true;
+let messagesLoading = false;
+
+let pendingAttachmentFile = null;
+let pendingAttachmentUrl = "";
+
+let notificationsEnabled = localStorage.getItem("notifications_enabled") === "1";
+
+let mentionUsers = [];
+let mentionDropdownIndex = 0;
+
+const messageCache = new Map();
 
 async function loadMe() {
     const res = await fetch("/me", {
@@ -278,6 +333,16 @@ function t(key, vars = {}) {
     return source.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
 }
 
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    }[char]));
+}
+
 function pluralizeRu(count, one, few, many) {
     const mod10 = count % 10;
     const mod100 = count % 100;
@@ -286,12 +351,34 @@ function pluralizeRu(count, one, few, many) {
     return many;
 }
 
+function formatUserCount(count) {
+    if (currentLanguage === "ru") {
+        return pluralizeRu(
+            count,
+            t("userCount_one", { count }),
+            t("userCount_few", { count }),
+            t("userCount_many", { count })
+        );
+    }
+
+    return count === 1
+        ? t("userCount_one", { count })
+        : t("userCount_many", { count });
+}
+
 function formatRoomCount(count) {
     if (currentLanguage === "ru") {
-        const form = pluralizeRu(count, t("roomCount_one", { count }), t("roomCount_few", { count }), t("roomCount_many", { count }));
-        return form;
+        return pluralizeRu(
+            count,
+            t("roomCount_one", { count }),
+            t("roomCount_few", { count }),
+            t("roomCount_many", { count })
+        );
     }
-    return count === 1 ? t("roomCount_one", { count }) : t("roomCount_many", { count });
+
+    return count === 1
+        ? t("roomCount_one", { count })
+        : t("roomCount_many", { count });
 }
 
 function scrollChatToBottom() {
@@ -355,6 +442,360 @@ function setInputPlaceholder(id, key) {
     }
 }
 
+function toggleChatFullscreen() {
+    chatFullscreen = !chatFullscreen;
+
+    document.body.classList.toggle("chat-fullscreen-mode", chatFullscreen);
+
+    const btn = document.getElementById("fullscreenChatBtn");
+
+    if (btn) {
+        btn.textContent = chatFullscreen ? "⮌" : "⛶";
+        // btn.title = chatFullscreen ? "Вернуть панель" : "Развернуть чат";
+    }
+}
+
+function getFileIcon(type) {
+    if (type.includes("pdf")) return "📄";
+    if (type.includes("zip") || type.includes("rar")) return "🗜️";
+    if (type.includes("text")) return "📝";
+    return "📎";
+}
+
+function setPendingAttachment(file) {
+    if (!file || !ensureRoomSelected()) return;
+
+    clearPendingAttachment();
+
+    pendingAttachmentFile = file;
+
+    const preview = document.getElementById("uploadPreview");
+    const media = document.getElementById("uploadPreviewMedia");
+    const name = document.getElementById("uploadPreviewName");
+    const meta = document.getElementById("uploadPreviewMeta");
+
+    media.innerHTML = "";
+    name.textContent = file.name;
+    meta.textContent = [file.type || t("fileLabel"), formatBytes(file.size)].filter(Boolean).join(" | ");
+
+    if (file.type.startsWith("image/")) {
+        pendingAttachmentUrl = URL.createObjectURL(file);
+
+        const img = document.createElement("img");
+        img.src = pendingAttachmentUrl;
+        img.alt = file.name;
+
+        media.appendChild(img);
+    } else if (file.type.startsWith("video/")) {
+        pendingAttachmentUrl = URL.createObjectURL(file);
+
+        const video = document.createElement("video");
+        video.src = pendingAttachmentUrl;
+        video.muted = true;
+        video.playsInline = true;
+
+        media.appendChild(video);
+    } else {
+        const fileBox = document.createElement("div");
+        fileBox.className = "upload-file-preview";
+
+        const icon = document.createElement("div");
+        icon.className = "upload-file-icon";
+        icon.textContent = getFileIcon(file.type);
+
+        fileBox.appendChild(icon);
+
+        media.appendChild(fileBox);
+    }
+
+    preview.classList.remove("hidden");
+    document.getElementById("message").focus();
+}
+
+function clearPendingAttachment() {
+    pendingAttachmentFile = null;
+
+    if (pendingAttachmentUrl) {
+        URL.revokeObjectURL(pendingAttachmentUrl);
+        pendingAttachmentUrl = "";
+    }
+
+    const preview = document.getElementById("uploadPreview");
+    const media = document.getElementById("uploadPreviewMedia");
+
+    if (preview) preview.classList.add("hidden");
+    if (media) media.innerHTML = "";
+}
+
+async function handleAttachmentSelect(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = "";
+
+    if (!file) return;
+
+    setPendingAttachment(file);
+}
+
+async function sendPendingAttachment() {
+    if (!pendingAttachmentFile || !ensureRoomSelected()) return;
+
+    const file = pendingAttachmentFile;
+    const caption = document.getElementById("message").value.trim();
+
+    const formData = new FormData();
+    formData.append("room_token", currentRoomToken);
+    formData.append("text", caption);
+    formData.append("file", file);
+
+    if (replyTarget?.id) {
+        formData.append("reply_to_id", String(replyTarget.id));
+    }
+
+    setComposerStatus(t("uploadingFile", { file: file.name }));
+
+    try {
+        const res = await fetch(`/rooms/${encodeURIComponent(currentRoom)}/attachments`, {
+            method: "POST",
+            headers: authHeaders({ json: false }),
+            body: formData
+        });
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
+            return;
+        }
+
+        clearPendingAttachment();
+        clearReplyTarget();
+
+        if (shouldAppendHttpResponse()) {
+            addMessage(data);
+        }
+
+        document.getElementById("message").value = "";
+        setComposerStatus(t("fileSent", { file: file.name }));
+    } catch {
+        setComposerStatus(t("uploadFailed"), true);
+    }
+}
+
+function sendTypingState(isTyping) {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !currentRoom) return;
+
+    ws.send(JSON.stringify({
+        type: "typing",
+        is_typing: isTyping
+    }));
+}
+
+function handleMessageInputTyping() {
+    sendTypingState(true);
+
+    clearTimeout(typingStopTimer);
+
+    typingStopTimer = setTimeout(() => {
+        sendTypingState(false);
+    }, 1200);
+}
+
+function contextEdit() {
+    if (contextMessage?.id) {
+        startEditingMessage(contextMessage.id);
+    }
+
+    closeMessageContextMenu();
+}
+
+function startEditingMessage(messageId) {
+    const node = document.querySelector(`.msg[data-message-id="${messageId}"]`);
+    const payload = messageCache.get(Number(messageId));
+
+    if (!node || !payload) return;
+
+    const textNode = node.querySelector(".msg-text");
+    if (!textNode) return;
+
+    const oldText = payload.text || "";
+
+    const editor = document.createElement("div");
+    editor.className = "msg-editor";
+
+    const input = document.createElement("textarea");
+    input.className = "msg-editor-input";
+    input.value = oldText;
+
+    const actions = document.createElement("div");
+    actions.className = "msg-editor-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "small-btn";
+    saveBtn.type = "button";
+    saveBtn.dataset.i18nKey = "save";
+    saveBtn.textContent = t("save");
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "secondary small-btn";
+    cancelBtn.type = "button";
+    cancelBtn.dataset.i18nKey = "cancel";
+    cancelBtn.textContent = t("cancel");
+
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+
+    editor.appendChild(input);
+    editor.appendChild(actions);
+
+    textNode.replaceWith(editor);
+    input.focus();
+
+    cancelBtn.addEventListener("click", () => {
+        editor.replaceWith(textNode);
+    });
+
+    saveBtn.addEventListener("click", async () => {
+        await submitEditMessage(messageId, input.value);
+    });
+}
+
+async function submitEditMessage(messageId, text) {
+    const cleanText = text.trim();
+
+    if (!cleanText) {
+        setComposerStatus(t("apiMessageEmpty"), true);
+        return;
+    }
+
+    const res = await fetch(`/messages/${encodeURIComponent(messageId)}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ text: cleanText })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        setComposerStatus(getApiErrorMessage(data, "cannotEditMessage"), true);
+        return;
+    }
+
+    if (data.message) {
+        updateMessageInChat(data.message);
+    }
+}
+
+function updateMessageInChat(payload) {
+    if (payload.id) {
+        messageCache.set(Number(payload.id), payload);
+    }
+
+    const oldNode = document.querySelector(`.msg[data-message-id="${payload.id}"]`);
+    if (!oldNode) return;
+
+    const newNode = createMessageNode(payload);
+    oldNode.replaceWith(newNode);
+}
+
+function updateMessageReactions(messageId, reactions) {
+    const id = Number(messageId);
+    const payload = messageCache.get(id);
+
+    if (!payload) return;
+
+    payload.reactions = reactions || {};
+    messageCache.set(id, payload);
+
+    updateMessageInChat(payload);
+}
+
+function openMessageContextMenu(event, payload) {
+    event.preventDefault();
+
+    contextMessage = payload;
+
+    const menu = document.getElementById("messageContextMenu");
+    const deleteBtn = document.getElementById("contextDeleteBtn");
+    const editBtn = document.getElementById("contextEditBtn");
+
+    editBtn.classList.toggle(
+        "hidden",
+        !(payload.id && payload.username === currentUser && payload.content_type === "text")
+    );
+
+    deleteBtn.classList.toggle("hidden", !(currentIsAdmin && payload.id));
+
+    menu.classList.remove("hidden");
+
+    const menuRect = menu.getBoundingClientRect();
+    const padding = 8;
+
+    let x = event.clientX;
+    let y = event.clientY;
+
+    if (x + menuRect.width > window.innerWidth - padding) {
+        x = window.innerWidth - menuRect.width - padding;
+    }
+
+    if (y + menuRect.height > window.innerHeight - padding) {
+        y = window.innerHeight - menuRect.height - padding;
+    }
+
+    menu.style.left = `${Math.max(padding, x)}px`;
+    menu.style.top = `${Math.max(padding, y)}px`;
+
+    menu.querySelector("button").textContent = t("reply");
+    deleteBtn.textContent = t("delete");
+}
+
+function closeMessageContextMenu() {
+    const menu = document.getElementById("messageContextMenu");
+    menu.classList.add("hidden");
+    contextMessage = null;
+}
+
+function contextReply() {
+    if (contextMessage?.id) {
+        setReplyTarget(contextMessage.id);
+    }
+
+    closeMessageContextMenu();
+}
+
+function contextDelete() {
+    if (contextMessage?.id && currentIsAdmin) {
+        deleteMessage(contextMessage.id);
+    }
+
+    closeMessageContextMenu();
+}
+
+async function contextReact(emoji) {
+    if (!contextMessage?.id) return;
+
+    try {
+        const res = await fetch(`/messages/${encodeURIComponent(contextMessage.id)}/reactions`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ emoji })
+        });
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            setComposerStatus(getApiErrorMessage(data, "cannotLoadMessages"), true);
+            return;
+        }
+
+        updateMessageReactions(data.message_id, data.reactions);
+    } catch {
+        setComposerStatus(t("cannotLoadMessages"), true);
+    } finally {
+        closeMessageContextMenu();
+    }
+}
+
 function updateTopAdminBadge() {
     const badge = document.getElementById("adminTopBadge");
     if (!badge) return;
@@ -387,13 +828,14 @@ function renderChatEmptyState() {
         empty = document.createElement("div");
         empty.id = "chatEmptyState";
         empty.className = "chat-empty";
-        chat.appendChild(empty);
     }
 
     empty.innerHTML = `
         <div class="chat-empty-title">${currentRoom ? t("emptyNoMessagesTitle") : t("emptyNoRoomTitle")}</div>
         <div class="chat-empty-text">${currentRoom ? t("emptyNoMessagesText") : t("emptyNoRoomText")}</div>
     `;
+
+    chat.appendChild(empty);
 }
 
 function toggleChatEmptyState() {
@@ -416,6 +858,8 @@ function refreshRuntimeTranslations() {
     document.querySelectorAll(".file-link[data-i18n-key='download']").forEach((node) => {
         node.textContent = t("download");
     });
+
+    document.getElementById("cancelPendingAttachment").textContent = t("cancel")
 }
 
 function applyTranslations() {
@@ -435,9 +879,26 @@ function applyTranslations() {
     setButtonText("refreshRoomsBtn", "refreshRooms");
     setButtonText("resetFiltersBtn", "resetFilters");
     setButtonText("leaveChatBtn", "leaveChat");
-    setButtonText("pickMediaBtn", "pickMedia");
-    setButtonText("pickFileBtn", "pickFile");
     setButtonText("sendBtn", "send");
+    setButtonText("contextReplyBtn", "reply");
+    setButtonText("contextEditBtn", "edit");
+    setButtonText("contextDeleteBtn", "delete");
+    setButtonText("roomUsersBtn", "users");
+
+    document.querySelectorAll("[data-i18n-key]").forEach((node) => {
+        node.textContent = t(node.dataset.i18nKey);
+    });
+
+    const attachBtn = document.getElementById("pickAttachmentBtn");
+    if (attachBtn) {
+        attachBtn.title = t("attachmentLabel");
+    }
+
+    const usersPopupSubtitle = document.getElementById("usersPopupSubtitle");
+    if (usersPopupSubtitle) {
+        const currentCount = document.querySelectorAll("#usersList .user-item").length;
+        usersPopupSubtitle.textContent = formatUserCount(currentCount);
+    }
 
     setInputPlaceholder("username", "usernamePlaceholder");
     setInputPlaceholder("password", "passwordPlaceholder");
@@ -456,12 +917,6 @@ function applyTranslations() {
     document.getElementById("sortOnlineAsc").textContent = t("sortOnlineAsc");
     document.getElementById("sortCreatorAsc").textContent = t("sortCreatorAsc");
 
-    setButtonText("roomUsersBtn", "users");
-    const usersTitle = document.getElementById("usersPopupTitle");
-    if (usersTitle) {
-        usersTitle.textContent = t("onlineUsers");
-    }
-
     updateLanguageButtons();
     updateChatHeader();
     updateRoomsCount();
@@ -470,7 +925,9 @@ function applyTranslations() {
     toggleChatEmptyState();
     refreshRuntimeTranslations();
     setRoomsListCollapsed(roomsListCollapsed);
+    closeMessageContextMenu();
     renderRooms();
+    updateNotificationsButton();
 }
 
 function setStatus(id, text, isError = false) {
@@ -535,6 +992,39 @@ function resolveAttachmentUrl(mediaUrl) {
 
 function getMessageType(payload) {
     return payload.content_type || "text";
+}
+
+function buildReactionsNode(payload) {
+    const reactions = payload.reactions || {};
+    const entries = Object.entries(reactions);
+
+    if (!entries.length) return null;
+
+    const box = document.createElement("div");
+    box.className = "msg-reactions";
+
+    for (const [emoji, users] of entries) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "msg-reaction";
+
+        if (users.includes(currentUser)) {
+            btn.classList.add("active");
+        }
+
+        btn.textContent = `${emoji} ${users.length}`;
+        btn.title = users.join(", ");
+
+        btn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            contextMessage = payload;
+            contextReact(emoji);
+        });
+
+        box.appendChild(btn);
+    }
+
+    return box;
 }
 
 function buildAttachmentNode(payload) {
@@ -625,8 +1115,95 @@ function getSystemMessageText(payload) {
     return payload.text || "";
 }
 
-function addMessage(payload) {
-    const chat = document.getElementById("chat");
+function updateNotificationsButton() {
+    const btn = document.getElementById("notificationsBtn");
+    if (!btn) return;
+
+    if (notificationsEnabled) {
+        btn.classList.remove("secondary");
+        btn.textContent = "🔔";
+    } else {
+        btn.classList.add("secondary");
+        btn.textContent = "🔕";
+    }
+}
+
+async function toggleNotifications() {
+    if (!("Notification" in window)) {
+        setComposerStatus("Notifications not supported", true);
+        return;
+    }
+
+    if (notificationsEnabled) {
+        notificationsEnabled = false;
+        localStorage.setItem("notifications_enabled", "0");
+        updateNotificationsButton();
+        return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission === "granted") {
+        notificationsEnabled = true;
+        localStorage.setItem("notifications_enabled", "1");
+        updateNotificationsButton();
+    }
+}
+
+function notificationAllowed() {
+    if (!notificationsEnabled) return false;
+    if (!("Notification" in window)) return false;
+    if (Notification.permission !== "granted") return false;
+
+    const isPageVisible = !document.hidden;
+    if (isPageVisible) return false;
+
+    return true;
+}
+
+function showNotification(title, body) {
+    if (notificationAllowed()) {
+        new Notification(title, { body });
+    }
+}
+
+function maybeNotify(payload) {
+    if (!notificationAllowed())
+        return;
+
+    if (!payload || payload.type !== "message") return false;
+    if (payload.username === currentUser) return false;
+
+    const roomName = payload.room || currentRoom;
+    const body = payload.text || payload.file_name || t("attachmentLabel");
+
+    new Notification(t("newMessageTitle", { room: roomName }), {
+        body,
+        tag: `room-${roomName}-${payload.id || Date.now()}`,
+        renotify: true,
+    });
+
+    return true;
+}
+
+function highlightMentions(text) {
+    return escapeHtml(text).replace(
+        /@([A-Za-z0-9_а-яА-ЯёЁ-]+)/g,
+        '<span class="mention">@$1</span>'
+    );
+}
+
+function handleMention(payload) {
+    const text = `${payload.from}: ${payload.text}`;
+
+    showNotification(t("mentionTitle"), text);
+
+    if (payload.room !== currentRoom) {
+        setStatus("roomStatus", t("mentionStatus", { user: payload.from }), false);
+    }
+}
+
+function createMessageNode(payload) {
     const div = document.createElement("div");
 
     if (payload.id) {
@@ -635,56 +1212,107 @@ function addMessage(payload) {
 
     if (payload.type === "system") {
         div.className = "msg system";
-        if (payload.system_event) {
-            div.dataset.systemEvent = payload.system_event;
-        }
-        if (payload.system_actor) {
-            div.dataset.systemActor = payload.system_actor;
-        }
+        if (payload.system_event) div.dataset.systemEvent = payload.system_event;
+        if (payload.system_actor) div.dataset.systemActor = payload.system_actor;
         div.innerText = getSystemMessageText(payload);
-
-        chat.appendChild(div);
-        toggleChatEmptyState();
-        scrollChatToBottom();
-        return;
+        return div;
     }
 
     const mine = payload.username === currentUser;
     div.className = "msg " + (mine ? "me" : "other");
 
+    div.addEventListener("contextmenu", (event) => {
+        openMessageContextMenu(event, payload);
+    });
+
+    div.addEventListener("touchstart", (event) => {
+        longPressTimer = setTimeout(() => {
+            const touch = event.touches[0];
+
+            openMessageContextMenu(
+                {
+                    preventDefault: () => event.preventDefault(),
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                },
+                payload
+            );
+        }, 550);
+    });
+
+    div.addEventListener("touchend", () => {
+        clearTimeout(longPressTimer);
+    });
+
+    div.addEventListener("touchmove", () => {
+        clearTimeout(longPressTimer);
+    });
+
     const username = document.createElement("div");
     username.className = "msg-username";
     username.textContent = payload.username;
+
+    if (payload.reply_to_id) {
+        const replied = messageCache.get(Number(payload.reply_to_id));
+
+        const replyBox = document.createElement("div");
+        replyBox.className = "msg-reply";
+
+        const replyAuthor = document.createElement("div");
+        replyAuthor.className = "msg-reply-author";
+        replyAuthor.textContent = replied?.username || "Reply";
+
+        const replyText = document.createElement("div");
+        replyText.className = "msg-reply-text";
+        replyText.textContent = replied ? getReplyTextPreview(replied) : `#${payload.reply_to_id}`;
+
+        replyBox.appendChild(replyAuthor);
+        replyBox.appendChild(replyText);
+
+        replyBox.addEventListener("click", () => {
+            const target = document.querySelector(`.msg[data-message-id="${payload.reply_to_id}"]`);
+            if (target) {
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        });
+
+        div.appendChild(replyBox);
+    }
 
     const attachmentNode = buildAttachmentNode(payload);
     const hasText = Boolean((payload.text || "").trim());
 
     div.appendChild(username);
 
-    if (attachmentNode) {
-        div.appendChild(attachmentNode);
-    }
+    if (attachmentNode) div.appendChild(attachmentNode);
 
     if (hasText) {
         const text = document.createElement("div");
         text.className = "msg-text";
-        text.textContent = payload.text;
+        text.innerHTML = highlightMentions(payload.text);
+        // text.textContent = payload.text;
         div.appendChild(text);
     }
 
+    const reactionsNode = buildReactionsNode(payload);
+    if (reactionsNode) div.appendChild(reactionsNode);
+
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.innerText = formatTime(payload.timestamp);
+    meta.innerText = payload.is_edited
+        ? `${formatTime(payload.timestamp)} · ${t("edited")}`
+        : formatTime(payload.timestamp);
     div.appendChild(meta);
 
-    if (currentIsAdmin && payload.id) {
-        const deleteButton = document.createElement("button");
-        deleteButton.className = "secondary small-btn msg-delete-btn";
-        deleteButton.textContent = t("delete");
-        deleteButton.type = "button";
-        deleteButton.addEventListener("click", () => deleteMessage(payload.id));
+    return div;
+}
 
-        div.appendChild(deleteButton);
+function addMessage(payload) {
+    const chat = document.getElementById("chat");
+    const div = createMessageNode(payload);
+
+    if (payload.id) {
+        messageCache.set(Number(payload.id), payload);
     }
 
     chat.appendChild(div);
@@ -878,6 +1506,39 @@ function getFilteredRooms() {
     return rooms;
 }
 
+function getReplyTextPreview(message) {
+    if (!message) return "";
+
+    const text = (message.text || "").trim();
+
+    if (text) return text;
+
+    if (message.file_name) return message.file_name;
+
+    if (message.content_type === "image") return t("attachmentLabel");
+    if (message.content_type === "video") return t("attachmentLabel");
+
+    return t("attachmentLabel");
+}
+
+function setReplyTarget(messageId) {
+    const message = messageCache.get(Number(messageId));
+    if (!message) return;
+
+    replyTarget = message;
+
+    document.getElementById("replyPreviewTitle").textContent = message.username;
+    document.getElementById("replyPreviewText").textContent = getReplyTextPreview(message);
+    document.getElementById("replyPreview").classList.remove("hidden");
+
+    document.getElementById("message").focus();
+}
+
+function clearReplyTarget() {
+    replyTarget = null;
+    document.getElementById("replyPreview").classList.add("hidden");
+}
+
 function renderRooms() {
     const list = document.getElementById("roomsList");
     list.innerHTML = "";
@@ -956,6 +1617,52 @@ function renderRooms() {
     }
 }
 
+function handleTypingPayload(payload) {
+    const username = payload.username;
+
+    if (!username || username === currentUser) return;
+
+    if (payload.is_typing) {
+        typingUsers.set(username, Date.now() + 2500);
+    } else {
+        typingUsers.delete(username);
+    }
+
+    renderTypingIndicator();
+}
+
+function renderTypingIndicator() {
+    const indicator = document.getElementById("typingIndicator");
+    if (!indicator) return;
+
+    const now = Date.now();
+
+    for (const [username, expiresAt] of typingUsers.entries()) {
+        if (expiresAt <= now) {
+            typingUsers.delete(username);
+        }
+    }
+
+    const users = Array.from(typingUsers.keys());
+
+    if (!users.length) {
+        indicator.classList.add("hidden");
+        indicator.textContent = "";
+        return;
+    }
+
+    indicator.classList.remove("hidden");
+
+    if (users.length === 1) {
+        indicator.textContent = t("typingOne", { user: users[0] });
+    } else {
+        indicator.textContent = t("typingMany", { users: users.join(", ") });
+    }
+
+    clearTimeout(typingRenderTimer);
+    typingRenderTimer = setTimeout(renderTypingIndicator, 1000);
+}
+
 function resetRoomFilters() {
     document.getElementById("roomSearch").value = "";
     document.getElementById("creatorSearch").value = "";
@@ -1022,9 +1729,15 @@ async function joinRoom(roomName, pwdInput) {
     document.getElementById("leaveChatBtn").classList.remove("hidden");
     document.getElementById("roomUsersBtn").classList.remove("hidden");
 
+    messagesNextBeforeId = null;
+    messagesHasMore = true;
+    messagesLoading = false;
+
     clearChat();
-    connectWS();
     await loadMessages();
+    await refreshMentionUsers();
+    connectWS();
+
     setRoomsListCollapsed(true);
     setStatus("roomStatus", t("joinedRoom", { room: roomName }));
     setComposerStatus("");
@@ -1032,19 +1745,63 @@ async function joinRoom(roomName, pwdInput) {
     await loadRooms();
 }
 
-async function loadMessages() {
-    const res = await fetch(
-        `/messages/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`
-    );
-    const data = await safeJson(res);
+async function loadMessages({ older = false } = {}) {
+    if (messagesLoading) return;
 
-    if (!res.ok) {
-        setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadMessages"), true);
-        return;
-    }
+    messagesLoading = true;
 
-    for (const message of data) {
-        addMessage(message);
+    const chat = document.getElementById("chat");
+    const oldScrollHeight = chat.scrollHeight;
+    const oldScrollTop = chat.scrollTop;
+
+    try {
+        let url = `/messages/${encodeURIComponent(currentRoom)}?room_token=${encodeURIComponent(currentRoomToken)}`;
+
+        if (older && messagesNextBeforeId) {
+            url += `&before_id=${encodeURIComponent(messagesNextBeforeId)}`;
+        }
+
+        const res = await fetch(url);
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+            setStatus("roomStatus", getApiErrorMessage(data, "cannotLoadMessages"), true);
+            return;
+        }
+
+        const messages = data.messages || [];
+
+        messagesNextBeforeId = data.next_before_id;
+        messagesHasMore = Boolean(data.has_more);
+
+        if (older) {
+            const fragment = document.createDocumentFragment();
+
+            for (const message of messages) {
+                if (message.id) {
+                    messageCache.set(Number(message.id), message);
+                }
+                fragment.appendChild(createMessageNode(message));
+            }
+
+            chat.insertBefore(fragment, chat.firstChild);
+            toggleChatEmptyState();
+        } else {
+            for (const message of messages) {
+                addMessage(message);
+            }
+        }
+
+        if (older) {
+            const newScrollHeight = chat.scrollHeight;
+            chat.scrollTop = newScrollHeight - oldScrollHeight + oldScrollTop;
+        } else {
+            scrollChatToBottom();
+        }
+    } catch {
+        setStatus("roomStatus", t("cannotLoadMessages"), true);
+    } finally {
+        messagesLoading = false;
     }
 }
 
@@ -1086,10 +1843,45 @@ function connectWS() {
             return;
         }
 
+        if (payload.type === "typing") {
+            handleTypingPayload(payload);
+            return;
+        }
+
+        if (payload.type === "mention") {
+            handleMention(payload);
+            return;
+        }
+
+        if (payload.type === "message_edited") {
+            updateMessageInChat(payload.message);
+            return;
+        }
+
+        if (payload.type === "message_reactions_updated") {
+            updateMessageReactions(payload.message_id, payload.reactions);
+            return;
+        }
+
         if (payload.type === "message_deleted") {
             removeMessageFromChat(payload.message_id);
             return;
         }
+
+        if (payload.type === "system") {
+            if (["joined", "left"].includes(payload.system_event)) {
+                refreshMentionUsers();
+
+                if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
+                    loadRoomUsers();
+                }
+            }
+
+            addMessage(payload);
+            return;
+        }
+
+        maybeNotify(payload);
 
         addMessage(payload);
         if (!document.getElementById("usersPopup")?.classList.contains("hidden")) {
@@ -1125,6 +1917,38 @@ function ensureRoomSelected() {
 }
 
 function handleComposerKey(event) {
+    const dropdown = document.getElementById("mentionDropdown");
+
+    if (dropdown && !dropdown.classList.contains("hidden")) {
+        const options = getVisibleMentionOptions();
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            mentionDropdownIndex = (mentionDropdownIndex + 1) % options.length;
+            renderMentionDropdown();
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            mentionDropdownIndex = (mentionDropdownIndex - 1 + options.length) % options.length;
+            renderMentionDropdown();
+            return;
+        }
+
+        if (event.key === "Enter" || event.key === "Tab") {
+            event.preventDefault();
+            insertMention(options[mentionDropdownIndex]);
+            return;
+        }
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMentionDropdown();
+            return;
+        }
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         sendMessage();
@@ -1133,6 +1957,10 @@ function handleComposerKey(event) {
 
 function sendMessage() {
     if (!ensureRoomSelected()) return;
+
+    if (pendingAttachmentFile) {
+        sendPendingAttachment();
+    }
 
     const input = document.getElementById("message");
     const text = input.value.trim();
@@ -1144,19 +1972,22 @@ function sendMessage() {
         return;
     }
 
-    ws.send(JSON.stringify({ text }));
+    ws.send(JSON.stringify({
+        text,
+        reply_to_id: replyTarget?.id || null
+    }));
+
+    sendTypingState(false);
+    clearTimeout(typingStopTimer);
+
     input.value = "";
+    clearReplyTarget();
     setComposerStatus("");
 }
 
-function pickMedia() {
+function pickAttachment() {
     if (!ensureRoomSelected()) return;
-    document.getElementById("mediaInput").click();
-}
-
-function pickFile() {
-    if (!ensureRoomSelected()) return;
-    document.getElementById("fileInput").click();
+    document.getElementById("attachmentInput").click();
 }
 
 function shouldAppendHttpResponse() {
@@ -1188,15 +2019,139 @@ async function deleteRoom(roomName) {
     await loadRooms();
 }
 
+function handleComposerInput() {
+    handleMessageInputTyping();
+    mentionDropdownIndex = 0;
+    renderMentionDropdown();
+}
+
+function closeMentionDropdown() {
+    const dropdown = document.getElementById("mentionDropdown");
+    if (dropdown) {
+        dropdown.classList.add("hidden");
+        dropdown.innerHTML = "";
+    }
+}
+
+function getVisibleMentionOptions() {
+    return Array.from(document.querySelectorAll("#mentionDropdown .mention-option"))
+        .map(node => node.textContent.replace(/^@/, ""));
+}
+
+function insertMention(username) {
+    const input = document.getElementById("message");
+    const mention = getCurrentMentionQuery(input);
+
+    if (!mention) return;
+
+    const before = input.value.slice(0, mention.start);
+    const after = input.value.slice(mention.end);
+
+    input.value = `${before}@${username} ${after}`;
+    const cursor = before.length + username.length + 2;
+
+    input.focus();
+    input.setSelectionRange(cursor, cursor);
+
+    closeMentionDropdown();
+    handleMessageInputTyping();
+}
+
+function renderMentionDropdown() {
+    const input = document.getElementById("message");
+    const dropdown = document.getElementById("mentionDropdown");
+    const mention = getCurrentMentionQuery(input);
+
+    if (!dropdown || !mention) {
+        closeMentionDropdown();
+        return;
+    }
+
+    const users = mentionUsers
+        .filter(username => username.toLowerCase().includes(mention.query))
+        .slice(0, 8);
+
+    if (!users.length) {
+        closeMentionDropdown();
+        return;
+    }
+
+    mentionDropdownIndex = Math.min(mentionDropdownIndex, users.length - 1);
+
+    dropdown.innerHTML = "";
+
+    users.forEach((username, index) => {
+        const item = document.createElement("div");
+        item.className = "mention-option" + (index === mentionDropdownIndex ? " active" : "");
+        item.textContent = `@${username}`;
+        item.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            insertMention(username);
+        });
+
+        dropdown.appendChild(item);
+    });
+
+    dropdown.classList.remove("hidden");
+}
+
+function getCurrentMentionQuery(input) {
+    const value = input.value;
+    const cursor = input.selectionStart ?? value.length;
+    const beforeCursor = value.slice(0, cursor);
+
+    const match = beforeCursor.match(/(^|\s)@([A-Za-z0-9_а-яА-ЯёЁ-]{0,32})$/);
+
+    if (!match) return null;
+
+    return {
+        query: match[2].toLowerCase(),
+        start: cursor - match[2].length - 1,
+        end: cursor,
+    };
+}
+
+async function refreshMentionUsers() {
+    if (!currentRoom || !currentRoomToken) {
+        mentionUsers = [];
+        return;
+    }
+
+    const res = await fetch(
+        `/rooms/${encodeURIComponent(currentRoom)}/users?room_token=${encodeURIComponent(currentRoomToken)}`
+    );
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+        mentionUsers = [];
+        return;
+    }
+
+    await setMentionUsers(data);
+}
+
+async function setMentionUsers(data) {
+    mentionUsers = (data.users || [])
+        .map(user => typeof user === "string" ? user : user.username)
+        .filter(username => username && username !== currentUser);
+}
+
 async function loadRoomUsers() {
     if (!currentRoom || !currentRoomToken) return;
 
     const list = document.getElementById("usersList");
     const subtitle = document.getElementById("usersPopupSubtitle");
+    const title = document.getElementById("usersPopupTitle");
 
     if (!list || !subtitle) return;
 
+    if (title) {
+        title.textContent = t("onlineUsers");
+    }
+
     list.innerHTML = `<div class="users-loading">...</div>`;
+    subtitle.textContent = formatUserCount(0);
 
     try {
         const res = await fetch(
@@ -1207,15 +2162,15 @@ async function loadRoomUsers() {
 
         if (!res.ok) {
             list.innerHTML = `<div class="users-empty">${getApiErrorMessage(data, "cannotLoadRooms")}</div>`;
-            subtitle.textContent = formatRoomCount(0);
+            subtitle.textContent = formatUserCount(0);
             return;
         }
 
-        subtitle.textContent = formatRoomCount(data.count || 0);
+        subtitle.textContent = formatUserCount(data.count || 0);
         renderUsersList(data.users || []);
     } catch {
         list.innerHTML = `<div class="users-empty">${t("cannotLoadRooms")}</div>`;
-        subtitle.textContent = formatRoomCount(0);
+        subtitle.textContent = formatUserCount(0);
     }
 }
 
@@ -1302,6 +2257,24 @@ function resetActiveRoomState() {
     currentRoom = "";
     currentRoomToken = "";
 
+    replyTarget = null;
+    messageCache.clear();
+
+    const replyPreview = document.getElementById("replyPreview");
+    if (replyPreview) {
+        replyPreview.classList.add("hidden");
+    }
+
+    mentionUsers = [];
+    closeMentionDropdown();
+
+    clearPendingAttachment();
+
+    typingUsers.clear();
+    clearTimeout(typingStopTimer);
+    clearTimeout(typingRenderTimer);
+    renderTypingIndicator();
+
     updateChatHeader();
     document.getElementById("leaveChatBtn").classList.add("hidden");
     document.getElementById("roomUsersBtn").classList.add("hidden");
@@ -1322,46 +2295,6 @@ async function handleRoomDeleted(payload) {
     await loadRooms();
 }
 
-async function handleAttachmentSelect(event) {
-    const input = event.target;
-    const file = input.files?.[0];
-    input.value = "";
-
-    if (!file || !ensureRoomSelected()) return;
-
-    const caption = document.getElementById("message").value.trim();
-    const formData = new FormData();
-    formData.append("room_token", currentRoomToken);
-    formData.append("text", caption);
-    formData.append("file", file);
-
-    setComposerStatus(t("uploadingFile", { file: file.name }));
-
-    try {
-        const res = await fetch(`/rooms/${encodeURIComponent(currentRoom)}/attachments`, {
-            method: "POST",
-            headers: authHeaders({ json: false }),
-            body: formData
-        });
-
-        const data = await safeJson(res);
-
-        if (!res.ok) {
-            setComposerStatus(getApiErrorMessage(data, "uploadFailed"), true);
-            return;
-        }
-
-        if (shouldAppendHttpResponse()) {
-            addMessage(data);
-        }
-
-        document.getElementById("message").value = "";
-        setComposerStatus(t("fileSent", { file: file.name }));
-    } catch (error) {
-        setComposerStatus(t("uploadFailed"), true);
-    }
-}
-
 async function leaveChat() {
     resetActiveRoomState();
     setStatus("roomStatus", t("leftRoom"));
@@ -1375,6 +2308,9 @@ function logout() {
     token = "";
     currentUser = "";
     currentIsAdmin = false;
+    notificationsEnabled = false;
+
+    localStorage.removeItem("notifications_enabled");
 
     localStorage.removeItem("token");
     localStorage.removeItem("username");
@@ -1384,8 +2320,6 @@ function logout() {
     document.getElementById("password").value = "";
     setStatus("roomStatus", "");
     showLoggedOutState();
-
-
 }
 
 async function initializeSession() {
@@ -1402,6 +2336,21 @@ async function initializeSession() {
     startRoomsAutoRefresh();
 }
 
+function handleChatScroll() {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    if (
+        currentRoom &&
+        currentRoomToken &&
+        messagesHasMore &&
+        !messagesLoading &&
+        chat.scrollTop < 80
+    ) {
+        loadMessages({ older: true });
+    }
+}
+
 document.addEventListener("visibilitychange", () => {
     if (!document.hidden && token) {
         loadRooms();
@@ -1409,3 +2358,71 @@ document.addEventListener("visibilitychange", () => {
 });
 
 initializeSession();
+
+document.getElementById("chat").addEventListener("scroll", handleChatScroll);
+window.addEventListener("scroll", closeMessageContextMenu, true);
+
+document.addEventListener("click", (event) => {
+    const menu = document.getElementById("messageContextMenu");
+
+    if (!menu || menu.classList.contains("hidden")) return;
+
+    if (!menu.contains(event.target)) {
+        closeMessageContextMenu();
+    }
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        closeMessageContextMenu();
+    }
+});
+
+window.addEventListener("resize", closeMessageContextMenu);
+
+const chatElement = document.getElementById("chat");
+
+chatElement.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    if (!currentRoom) return;
+    chatElement.classList.add("drag-over");
+});
+
+chatElement.addEventListener("dragleave", () => {
+    chatElement.classList.remove("drag-over");
+});
+
+chatElement.addEventListener("drop", (event) => {
+    event.preventDefault();
+    chatElement.classList.remove("drag-over");
+
+    if (!ensureRoomSelected()) return;
+
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+
+    setPendingAttachment(file);
+});
+
+document.addEventListener("paste", (event) => {
+    if (!currentRoom || !currentRoomToken) return;
+
+    const items = Array.from(event.clipboardData?.items || []);
+    const fileItem = items.find(item => item.kind === "file");
+
+    if (!fileItem) return;
+
+    const file = fileItem.getAsFile();
+    if (!file) return;
+
+    event.preventDefault();
+
+    const extension = file.type.startsWith("image/") ? "png" : "file";
+    const namedFile = new File(
+        [file],
+        file.name || `pasted-${Date.now()}.${extension}`,
+        { type: file.type }
+    );
+
+    setPendingAttachment(namedFile);
+});

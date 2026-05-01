@@ -44,11 +44,11 @@
             <div class="section hidden" id="roomsSection">
                 <div class="topbar">
                     <div class="whoami-row">
-                    <b id="whoami"></b>
-                    <span id="adminTopBadge" class="admin-badge hidden">👑 Admin</span>
-                </div>
+                        <b id="whoami"></b>
+                        <span id="adminTopBadge" class="admin-badge hidden">👑 Admin</span>
+                    </div>
 
-                <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
+                    <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
                 </div>
 
                 <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
@@ -118,8 +118,16 @@
                         </div>
                     </div>
                     <div class="chat-actions">
-                        <button id="roomUsersBtn" class="secondary small-btn hidden" onclick="toggleUsersPopup()">Users</button>
-                        <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit chat</button>
+                        <button id="roomUsersBtn" class="secondary small-btn hidden"
+                            onclick="toggleUsersPopup()">Users</button>
+                        <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit
+                            chat</button>
+                        <button id="notificationsBtn" class="secondary small-btn toggle-btn"
+                            onclick="toggleNotifications()">
+                        </button>
+                        <button id="fullscreenChatBtn" class="secondary small-btn" onclick="toggleChatFullscreen()">
+                            ⛶
+                        </button>
                     </div>
                 </div>
             </div>
@@ -137,21 +145,59 @@
                 </div>
             </div>
             <div id="chat" class="chat"></div>
+            <div id="typingIndicator" class="typing-indicator hidden"></div>
             <div class="composer">
                 <div class="composer-tools">
-                    <button id="pickMediaBtn" class="secondary tool-btn" onclick="pickMedia()">Photo or video</button>
-                    <button id="pickFileBtn" class="secondary tool-btn" onclick="pickFile()">File</button>
+
+                </div>
+                <div id="replyPreview" class="reply-preview hidden">
+                    <div>
+                        <div class="reply-preview-title" id="replyPreviewTitle"></div>
+                        <div class="reply-preview-text" id="replyPreviewText"></div>
+                    </div>
+                    <button type="button" class="reply-preview-close" onclick="clearReplyTarget()">×</button>
+                </div>
+                <div id="mentionDropdown" class="mention-dropdown hidden"></div>
+                <div id="uploadPreview" class="upload-preview hidden">
+                    <div id="uploadPreviewMedia" class="upload-preview-media"></div>
+
+                    <div class="upload-preview-info">
+                        <div id="uploadPreviewName" class="upload-preview-name"></div>
+                        <div id="uploadPreviewMeta" class="upload-preview-meta"></div>
+                    </div>
+
+                    <div class="upload-preview-actions">
+                        <button id="cancelPendingAttachment" type="button" class="secondary small-btn"
+                            onclick="clearPendingAttachment()">Cancel</button>
+                    </div>
                 </div>
                 <div class="input-row">
+                    <button id="pickAttachmentBtn" class="secondary tool-btn attach-btn" style="max-width: 40px;"
+                        onclick="pickAttachment()" title="Attach file">
+                        📎
+                    </button>
                     <input id="message" placeholder="Type a message or add a caption..."
-                        onkeydown="handleComposerKey(event)" />
+                        onkeydown="handleComposerKey(event)"
+                        oninput="handleMessageInputTyping(); handleComposerInput();" />
                     <button id="sendBtn" style="width:120px" onclick="sendMessage()">Send</button>
                 </div>
                 <div id="composerStatus" class="status composer-status"></div>
-                <input id="mediaInput" class="hidden" type="file" accept="image/*,video/*"
-                    onchange="handleAttachmentSelect(event)" />
-                <input id="fileInput" class="hidden" type="file" onchange="handleAttachmentSelect(event)" />
+                <input id="attachmentInput" class="hidden" type="file" onchange="handleAttachmentSelect(event)" />
             </div>
+        </div>
+    </div>
+
+    <div id="messageContextMenu" class="context-menu hidden">
+        <button id="contextReplyBtn" type="button" onclick="contextReply()">Reply</button>
+        <button id="contextEditBtn" type="button" class="hidden" onclick="contextEdit()">Edit</button>
+        <button id="contextDeleteBtn" type="button" class="danger hidden" onclick="contextDelete()">Delete</button>
+        <div class="context-reactions">
+            <button type="button" onclick="contextReact('👍')">👍</button>
+            <button type="button" onclick="contextReact('❤️')">❤️</button>
+            <button type="button" onclick="contextReact('😂')">😂</button>
+            <button type="button" onclick="contextReact('😮')">😮</button>
+            <button type="button" onclick="contextReact('😢')">😢</button>
+            <button type="button" onclick="contextReact('🔥')">🔥</button>
         </div>
     </div>
 

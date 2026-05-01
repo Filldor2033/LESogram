@@ -1,7 +1,13 @@
 fastapi
 uvicorn[standard]
+aiosqlite
 sqlalchemy
 python-jose
 pwdlib[argon2]
 python-multipart
 pydantic
+pillow
+
+pytest
+pytest-asyncio
+httpx
