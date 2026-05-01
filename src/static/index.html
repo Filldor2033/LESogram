@@ -18,13 +18,15 @@
                         <div class="brand-mark"></div>
                         <div class="brand-copy">
                             <div class="brand-title">LESogram</div>
-                            <div class="brand-subtitle" id="brandSubtitle">Fast rooms, live messages, simple sharing
+                            <div class="brand-subtitle" id="brandSubtitle">
+                                Fast rooms, live messages, simple sharing
                             </div>
                         </div>
                     </div>
+
                     <div class="lang-switch" aria-label="Language switch">
-                        <button id="langEnBtn" class="lang-btn" type="button" onclick="setLanguage('en')">EN</button>
-                        <button id="langRuBtn" class="lang-btn" type="button" onclick="setLanguage('ru')">RU</button>
+                        <button id="langEnBtn" class="lang-btn" type="button">EN</button>
+                        <button id="langRuBtn" class="lang-btn" type="button">RU</button>
                     </div>
                 </div>
             </div>
@@ -32,11 +34,16 @@
             <div class="section" id="authSection">
                 <div class="section-block">
                     <div class="section-title" id="authTitle">Account</div>
+
                     <input id="username" placeholder="Username" />
                     <input id="password" type="password" placeholder="Password" />
-                    <button id="loginBtn" onclick="auth('login')">Login</button>
+
+                    <button id="loginBtn" type="button">Login</button>
+
                     <div style="height:8px"></div>
-                    <button id="registerBtn" class="secondary" onclick="auth('register')">Register</button>
+
+                    <button id="registerBtn" class="secondary" type="button">Register</button>
+
                     <div id="authStatus" class="status"></div>
                 </div>
             </div>
@@ -48,16 +55,19 @@
                         <span id="adminTopBadge" class="admin-badge hidden">👑 Admin</span>
                     </div>
 
-                    <button id="logoutBtn" class="secondary small-btn" onclick="logout()">Exit</button>
+                    <button id="logoutBtn" class="secondary small-btn" type="button">Exit</button>
                 </div>
 
                 <hr style="border-color:#1f2937; opacity:.4; margin:16px 0">
 
                 <div class="section-block">
                     <div class="section-title" id="createRoomTitle">Create Room</div>
+
                     <input id="newRoomName" placeholder="New room name" />
                     <input id="newRoomPassword" type="password" placeholder="Room password" />
-                    <button id="createRoomBtn" onclick="createRoom()">Create room</button>
+
+                    <button id="createRoomBtn" type="button">Create room</button>
+
                     <div id="roomStatus" class="status"></div>
                 </div>
 
@@ -65,27 +75,32 @@
 
                 <div class="section-block">
                     <div class="section-title-row">
-                        <div class="section-title" id="roomListTitle" style="margin-bottom:0">Room List</div>
+                        <div class="section-title" id="roomListTitle" style="margin-bottom:0">
+                            Room List
+                        </div>
                         <div class="section-pill" id="roomsCountPill">0 rooms</div>
                     </div>
+
                     <div class="rooms-list-header">
                         <div class="rooms-list-title" id="roomListSubtitle">Browse and join</div>
-                        <button id="toggleRoomsBtn" class="secondary small-btn" onclick="toggleRoomsList()">Hide
-                            list</button>
+                        <button id="toggleRoomsBtn" class="secondary small-btn" type="button">
+                            Hide list
+                        </button>
                     </div>
+
                     <div id="roomsListSection">
                         <div class="filters">
-                            <input id="roomSearch" placeholder="Search by room name..." oninput="renderRooms()" />
-                            <input id="creatorSearch" placeholder="Search by creator..." oninput="renderRooms()" />
+                            <input id="roomSearch" placeholder="Search by room name..." />
+                            <input id="creatorSearch" placeholder="Search by creator..." />
 
                             <div class="filters-row">
-                                <select id="onlineFilter" onchange="renderRooms()">
+                                <select id="onlineFilter">
                                     <option id="onlineFilterAll" value="all">All rooms</option>
                                     <option id="onlineFilterOnline" value="online">Only with online users</option>
                                     <option id="onlineFilterEmpty" value="empty">Only empty rooms</option>
                                 </select>
 
-                                <select id="sortRooms" onchange="renderRooms()">
+                                <select id="sortRooms">
                                     <option id="sortNameAsc" value="name_asc">Name A-Z</option>
                                     <option id="sortNameDesc" value="name_desc">Name Z-A</option>
                                     <option id="sortOnlineDesc" value="online_desc">Online first</option>
@@ -95,12 +110,15 @@
                             </div>
 
                             <div class="filters-row">
-                                <button id="refreshRoomsBtn" class="secondary" onclick="loadRooms()">Refresh
-                                    rooms</button>
-                                <button id="resetFiltersBtn" class="secondary" onclick="resetRoomFilters()">Reset
-                                    filters</button>
+                                <button id="refreshRoomsBtn" class="secondary" type="button">
+                                    Refresh rooms
+                                </button>
+                                <button id="resetFiltersBtn" class="secondary" type="button">
+                                    Reset filters
+                                </button>
                             </div>
                         </div>
+
                         <div id="roomsList"></div>
                     </div>
                 </div>
@@ -117,20 +135,28 @@
                             <small id="chatSubheader">Choose a room to start chatting</small>
                         </div>
                     </div>
+
                     <div class="chat-actions">
-                        <button id="roomUsersBtn" class="secondary small-btn hidden"
-                            onclick="toggleUsersPopup()">Users</button>
-                        <button id="leaveChatBtn" class="secondary small-btn hidden" onclick="leaveChat()">Exit
-                            chat</button>
-                        <button id="notificationsBtn" class="secondary small-btn toggle-btn"
-                            onclick="toggleNotifications()">
+                        <button id="roomUsersBtn" class="secondary small-btn hidden" type="button">
+                            Users
                         </button>
-                        <button id="fullscreenChatBtn" class="secondary small-btn" onclick="toggleChatFullscreen()">
+
+                        <button id="leaveChatBtn" class="secondary small-btn hidden" type="button">
+                            Exit chat
+                        </button>
+
+                        <button id="notificationsBtn" class="secondary small-btn toggle-btn" type="button"
+                            aria-label="Toggle notifications">
+                        </button>
+
+                        <button id="fullscreenChatBtn" class="secondary small-btn" type="button"
+                            aria-label="Toggle fullscreen chat">
                             ⛶
                         </button>
                     </div>
                 </div>
             </div>
+
             <div id="usersPopup" class="users-popup hidden">
                 <div class="users-card">
                     <div class="users-card-header">
@@ -138,26 +164,36 @@
                             <div class="users-title" id="usersPopupTitle">Online users</div>
                             <div class="users-subtitle" id="usersPopupSubtitle">0 users</div>
                         </div>
-                        <button class="users-close" type="button" onclick="closeUsersPopup()">×</button>
+
+                        <button id="closeUsersPopupBtn" class="users-close" type="button">
+                            ×
+                        </button>
                     </div>
 
                     <div id="usersList" class="users-list"></div>
                 </div>
             </div>
-            <div id="chat" class="chat"></div>
-            <div id="typingIndicator" class="typing-indicator hidden"></div>
-            <div class="composer">
-                <div class="composer-tools">
 
-                </div>
+            <div id="chat" class="chat"></div>
+
+            <div id="typingIndicator" class="typing-indicator hidden"></div>
+
+            <div class="composer">
+                <div class="composer-tools"></div>
+
                 <div id="replyPreview" class="reply-preview hidden">
                     <div>
                         <div class="reply-preview-title" id="replyPreviewTitle"></div>
                         <div class="reply-preview-text" id="replyPreviewText"></div>
                     </div>
-                    <button type="button" class="reply-preview-close" onclick="clearReplyTarget()">×</button>
+
+                    <button id="clearReplyTargetBtn" type="button" class="reply-preview-close">
+                        ×
+                    </button>
                 </div>
+
                 <div id="mentionDropdown" class="mention-dropdown hidden"></div>
+
                 <div id="uploadPreview" class="upload-preview hidden">
                     <div id="uploadPreviewMedia" class="upload-preview-media"></div>
 
@@ -167,41 +203,48 @@
                     </div>
 
                     <div class="upload-preview-actions">
-                        <button id="cancelPendingAttachment" type="button" class="secondary small-btn"
-                            onclick="clearPendingAttachment()">Cancel</button>
+                        <button id="cancelPendingAttachment" type="button" class="secondary small-btn">
+                            Cancel
+                        </button>
                     </div>
                 </div>
+
                 <div class="input-row">
                     <button id="pickAttachmentBtn" class="secondary tool-btn attach-btn" style="max-width: 40px;"
-                        onclick="pickAttachment()" title="Attach file">
+                        type="button" title="Attach file" aria-label="Attach file">
                         📎
                     </button>
-                    <input id="message" placeholder="Type a message or add a caption..."
-                        onkeydown="handleComposerKey(event)"
-                        oninput="handleMessageInputTyping(); handleComposerInput();" />
-                    <button id="sendBtn" style="width:120px" onclick="sendMessage()">Send</button>
+
+                    <input id="message" placeholder="Type a message or add a caption..." />
+
+                    <button id="sendBtn" style="width:120px" type="button">
+                        Send
+                    </button>
                 </div>
+
                 <div id="composerStatus" class="status composer-status"></div>
-                <input id="attachmentInput" class="hidden" type="file" onchange="handleAttachmentSelect(event)" />
+
+                <input id="attachmentInput" class="hidden" type="file" />
             </div>
         </div>
     </div>
 
     <div id="messageContextMenu" class="context-menu hidden">
-        <button id="contextReplyBtn" type="button" onclick="contextReply()">Reply</button>
-        <button id="contextEditBtn" type="button" class="hidden" onclick="contextEdit()">Edit</button>
-        <button id="contextDeleteBtn" type="button" class="danger hidden" onclick="contextDelete()">Delete</button>
+        <button id="contextReplyBtn" type="button">Reply</button>
+        <button id="contextEditBtn" type="button" class="hidden">Edit</button>
+        <button id="contextDeleteBtn" type="button" class="danger hidden">Delete</button>
+
         <div class="context-reactions">
-            <button type="button" onclick="contextReact('👍')">👍</button>
-            <button type="button" onclick="contextReact('❤️')">❤️</button>
-            <button type="button" onclick="contextReact('😂')">😂</button>
-            <button type="button" onclick="contextReact('😮')">😮</button>
-            <button type="button" onclick="contextReact('😢')">😢</button>
-            <button type="button" onclick="contextReact('🔥')">🔥</button>
+            <button type="button" data-context-reaction="👍">👍</button>
+            <button type="button" data-context-reaction="❤️">❤️</button>
+            <button type="button" data-context-reaction="😂">😂</button>
+            <button type="button" data-context-reaction="😮">😮</button>
+            <button type="button" data-context-reaction="😢">😢</button>
+            <button type="button" data-context-reaction="🔥">🔥</button>
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
 
 </body>
 
