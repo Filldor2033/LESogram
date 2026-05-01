@@ -19,7 +19,7 @@ async def test_connection_manager_broadcast_with_dead_connections():
     ws_dead.send_json = AsyncMock(side_effect=ConnectionError("dead"))
 
     room = "test_room"
-    manager.active_connections[room] = [ws_good, ws_dead]
+    manager.active_connections[room] = {ws_good, ws_dead}
 
     await manager.broadcast_json({"type": "test"}, room)
 
@@ -54,7 +54,7 @@ async def test_connection_manager_broadcast_removes_dead():
     ws_dead.send_json = AsyncMock(side_effect=RuntimeError("Connection lost"))
 
     room = "test"
-    manager.active_connections[room] = [ws_alive, ws_dead]
+    manager.active_connections[room] = {ws_alive, ws_dead}
 
     await manager.broadcast_json({"type": "ping"}, room)
 
