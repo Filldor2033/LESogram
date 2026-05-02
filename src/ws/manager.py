@@ -1,7 +1,8 @@
 import asyncio
+import json
 from collections import defaultdict
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 
 
@@ -27,6 +28,8 @@ class ConnectionManager:
         room: str,
         exclude: WebSocket | None = None,
     ):
+        text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+
         connections = [
             conn
             for conn in list(self.active_connections.get(room, set()))
@@ -37,9 +40,9 @@ class ConnectionManager:
             return
 
         if len(connections) < self.concurrent_threshold:
-            dead = await self._broadcast_sequential(data, connections)
+            dead = await self._broadcast_text_sequential(text, connections)
         else:
-            dead = await self._broadcast_concurrent(data, connections)
+            dead = await self._broadcast_text_concurrent(text, connections)
 
         for conn in dead:
             self.disconnect(conn, room)
@@ -50,15 +53,15 @@ class ConnectionManager:
         room: str,
         username: str,
     ):
-        connections = self.active_connections.get(room, [])
-
+        text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        connections = list(self.active_connections.get(room, []))
         dead = []
 
-        for conn in list(connections):
+        for conn in connections:
             if getattr(conn.state, "username", None) != username:
                 continue
 
-            ok = await self._send_safe(conn, data)
+            ok = await self._send_text_safe(conn, text)
 
             if not ok:
                 dead.append(conn)
@@ -66,67 +69,65 @@ class ConnectionManager:
         for conn in dead:
             self.disconnect(conn, room)
 
-    async def _broadcast_sequential(
+    async def _broadcast_text_sequential(
         self,
-        data: dict,
+        text: str,
         connections: list[WebSocket],
     ) -> list[WebSocket]:
         dead = []
 
         for conn in connections:
-            ok = await self._send_safe(conn, data)
+            ok = await self._send_text_safe(conn, text)
+
             if not ok:
                 dead.append(conn)
 
         return dead
 
-    async def _broadcast_concurrent(
+    async def _broadcast_text_concurrent(
         self,
-        data: dict,
+        text: str,
         connections: list[WebSocket],
     ) -> list[WebSocket]:
-        dead: list[WebSocket] = []
+        results = await asyncio.gather(
+            *(self._send_text_safe(conn, text) for conn in connections),
+            return_exceptions=True,
+        )
 
-        async with asyncio.TaskGroup() as tg:
-            for conn in connections:
-                tg.create_task(self._send_and_track(conn, data, dead))
+        return [
+            conn
+            for conn, result in zip(connections, results)
+            if result is not True
+        ]
 
-        return dead
-
-    async def _send_and_track(
+    async def _send_text_safe(
         self,
         websocket: WebSocket,
-        data: dict,
-        dead_list: list[WebSocket],
-    ):
-        ok = await self._send_safe(websocket, data)
-        if not ok:
-            dead_list.append(websocket)
+        text: str,
+    ) -> bool:
+        try:
+            await asyncio.wait_for(websocket.send_text(text), timeout=3.0)
+            return True
+        except Exception:
+            return False
 
     async def _send_safe(
         self,
         websocket: WebSocket,
         data: dict,
     ) -> bool:
-        try:
-            await asyncio.wait_for(websocket.send_json(data), timeout=5.0)
-            return True
-        except (
-            WebSocketDisconnect,
-            ConnectionResetError,
-            asyncio.TimeoutError,
-            OSError,
-            RuntimeError,
-        ):
-            return False
+        text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        return await self._send_text_safe(websocket, text)
 
     async def close_room(self, room: str, code: int = 1008):
         connections = list(self.active_connections.get(room, []))
+
         for connection in connections:
             try:
                 await connection.close(code=code)
             except Exception:
                 pass
+
         self.active_connections.pop(room, None)
 
 

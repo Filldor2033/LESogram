@@ -12,18 +12,18 @@ async def test_connection_manager_broadcast_with_dead_connections():
 
     ws_good = Mock()
     ws_good.client_state = WebSocketState.CONNECTED
-    ws_good.send_json = AsyncMock()
+    ws_good.send_text = AsyncMock()
 
     ws_dead = Mock()
     ws_dead.client_state = WebSocketState.CONNECTED
-    ws_dead.send_json = AsyncMock(side_effect=ConnectionError("dead"))
+    ws_dead.send_text = AsyncMock(side_effect=RuntimeError("dead"))
 
     room = "test_room"
     manager.active_connections[room] = {ws_good, ws_dead}
 
     await manager.broadcast_json({"type": "test"}, room)
 
-    ws_good.send_json.assert_called_once()
+    ws_good.send_text.assert_called_once()
     assert ws_dead not in manager.active_connections.get(room, [])
 
 
@@ -33,7 +33,8 @@ async def test_connection_manager_close_room():
 
     ws = Mock()
     ws.close = AsyncMock()
-    manager.active_connections["temp_room"] = [ws]
+
+    manager.active_connections["temp_room"] = {ws}
 
     await manager.close_room("temp_room", code=1001)
 
@@ -47,18 +48,21 @@ async def test_connection_manager_broadcast_removes_dead():
 
     ws_alive = Mock()
     ws_alive.client_state = WebSocketState.CONNECTED
-    ws_alive.send_json = AsyncMock()
+    ws_alive.send_text = AsyncMock()
 
     ws_dead = Mock()
     ws_dead.client_state = WebSocketState.CONNECTED
-    ws_dead.send_json = AsyncMock(side_effect=RuntimeError("Connection lost"))
+    ws_dead.send_text = AsyncMock(side_effect=RuntimeError("Connection lost"))
 
     room = "test"
     manager.active_connections[room] = {ws_alive, ws_dead}
 
     await manager.broadcast_json({"type": "ping"}, room)
 
-    ws_alive.send_json.assert_called_once_with({"type": "ping"})
+    ws_alive.send_text.assert_called_once()
+
+    sent_text = ws_alive.send_text.call_args.args[0]
+    assert '"type":"ping"' in sent_text
 
     assert ws_dead not in manager.active_connections.get(room, [])
     assert ws_alive in manager.active_connections.get(room, [])

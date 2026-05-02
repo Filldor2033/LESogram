@@ -5,12 +5,9 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from core.config import HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, MAX_MESSAGE_LENGTH
-from core.rate_limit import check_duplicate_message_limit, check_websocket_rate_limit, enforce_websocket_rate_limit, get_client_ip_from_websocket
+from core.rate_limit import check_websocket_rate_limit, get_client_ip_from_websocket
 from database import SessionLocal
 from models import Room, User
-from services.messages import save_message, serialize_message
-from services.parse import extract_mentions
 from services.rooms import build_system_payload, room_members, verify_room_token
 from utils.time import utc_now
 from ws.events import handle_message_event, handle_typing_event
