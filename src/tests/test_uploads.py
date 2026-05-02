@@ -101,7 +101,7 @@ def test_detect_mime_by_magic(content, expected):
             "document.docx",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             b"PK\x03\x04" + b"x" * 20,
-            "application/octet-stream",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "file",
         ),
     ],

@@ -8,6 +8,15 @@ from PIL import Image, UnidentifiedImageError
 from core.config import *
 from models import Message
 
+OFFICE_MIME_BY_EXTENSION = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".doc": "application/msword",
+    ".xls": "application/vnd.ms-excel",
+    ".ppt": "application/vnd.ms-powerpoint",
+}
+
 
 def sanitize_filename(filename: str | None) -> str:
     original = Path(filename or "").name or "attachment"
@@ -101,9 +110,12 @@ def validate_upload_file_type(
     if detected_mime in ALLOWED_VIDEO_MIME_TYPES:
         return detected_mime, "video"
 
-    guessed_mime = (
-        mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    ).lower()
+    guessed_mime = OFFICE_MIME_BY_EXTENSION.get(ext)
+
+    if guessed_mime is None:
+        guessed_mime = (
+            mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        ).lower()
 
     # ZIP-контейнеры: docx/xlsx/pptx технически являются zip.
     if ext in {".docx", ".xlsx", ".pptx"} and detected_mime == "application/zip":
