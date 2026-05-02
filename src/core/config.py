@@ -10,6 +10,27 @@ MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 
 MAX_IMAGE_PIXELS = 20_000_000
 
+ALLOWED_AUDIO_MIME_TYPES = {
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/ogg",
+    "audio/webm",
+    "audio/aac",
+    "audio/flac",
+}
+
+ALLOWED_AUDIO_EXTENSIONS = {
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".webm",
+    ".aac",
+    ".flac",
+    ".m4a",
+}
+
 ALLOWED_IMAGE_MIME_TYPES = {
     "image/jpeg",
     "image/png",
@@ -53,6 +74,13 @@ ALLOWED_FILE_EXTENSIONS = {
     ".xlsx",
     ".ppt",
     ".pptx",
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".webm",
+    ".aac",
+    ".flac",
+    ".m4a",
 }
 
 DANGEROUS_FILE_EXTENSIONS = {

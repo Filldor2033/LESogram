@@ -43,23 +43,33 @@ def detect_mime_by_magic(content: bytes) -> str | None:
 
     if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WEBP":
         return "image/webp"
+    
+    if head.startswith(b"ID3"):
+        return "audio/mpeg"
+
+    if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0:
+        return "audio/mpeg"
+
+    if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
+
+    if head.startswith(b"OggS"):
+        return "audio/ogg"
+
+    if head.startswith(b"fLaC"):
+        return "audio/flac"
+
+    if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xF6) == 0xF0:
+        return "audio/aac"
 
     if len(head) >= 12 and head[4:8] == b"ftyp":
         brand = head[8:12]
-        if brand in {
-            b"avif",
-            b"avis",
-            b"qt  ",
-            b"isom",
-            b"iso2",
-            b"mp41",
-            b"mp42",
-            b"M4V ",
-            b"M4A ",
-        }:
-            if brand == b"qt  ":
-                return "video/quicktime"
-            return "video/mp4"
+
+        if brand == b"qt  ":
+            return "video/quicktime"
+
+        if brand in {b"M4A ", b"M4B "}:
+            return "audio/mp4"
 
         return "video/mp4"
 
@@ -109,6 +119,9 @@ def validate_upload_file_type(
 
     if detected_mime in ALLOWED_VIDEO_MIME_TYPES:
         return detected_mime, "video"
+    
+    if detected_mime in ALLOWED_AUDIO_MIME_TYPES:
+        return detected_mime, "file"
 
     guessed_mime = OFFICE_MIME_BY_EXTENSION.get(ext)
 
@@ -117,11 +130,9 @@ def validate_upload_file_type(
             mimetypes.guess_type(filename)[0] or "application/octet-stream"
         ).lower()
 
-    # ZIP-контейнеры: docx/xlsx/pptx технически являются zip.
     if ext in {".docx", ".xlsx", ".pptx"} and detected_mime == "application/zip":
         return guessed_mime, "file"
 
-    # Старые doc/xls/ppt имеют OLE container signature.
     if ext in {".doc", ".xls", ".ppt"} and detected_mime == "application/octet-stream":
         return guessed_mime, "file"
 
