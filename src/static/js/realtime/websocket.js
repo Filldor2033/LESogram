@@ -20,6 +20,67 @@ import {
 
 import { toggleChatEmptyState } from "../ui/empty-state.js";
 
+const payloadHandlers = {
+    ping(payload, socket) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: "pong",
+                timestamp: new Date().toISOString(),
+            }));
+        }
+    },
+
+    async system(payload) {
+        if (
+            payload.system_event === "room_deleted" &&
+            payload.room === state.currentRoom
+        ) {
+            await handleRoomDeleted(payload);
+            return;
+        }
+
+        if (["joined", "left"].includes(payload.system_event)) {
+            refreshMentionUsers();
+
+            if (usersPopupIsOpen()) {
+                loadRoomUsers();
+            }
+        }
+
+        addMessage(payload);
+    },
+
+    typing(payload) {
+        handleTypingPayload(payload);
+    },
+
+    mention(payload) {
+        handleMention(payload);
+    },
+
+    message_edited(payload) {
+        updateMessageInChat(payload.message);
+    },
+
+    message_reactions_updated(payload) {
+        updateMessageReactions(payload.message_id, payload.reactions);
+    },
+
+    message_deleted(payload) {
+        removeMessageFromChat(payload.message_id);
+        toggleChatEmptyState();
+    },
+
+    default(payload) {
+        maybeNotify(payload);
+        addMessage(payload);
+
+        if (usersPopupIsOpen()) {
+            loadRoomUsers();
+        }
+    },
+};
+
 function handleTypingPayload(payload) {
     const username = payload.username;
 
@@ -115,71 +176,9 @@ export function connectWS() {
 
         if (payload.room && payload.room !== state.currentRoom) return;
 
-        if (payload.type === "ping") {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: "pong",
-                    timestamp: new Date().toISOString(),
-                }));
-            }
-            return;
-        }
+        const handler = payloadHandlers[payload.type] || payloadHandlers.default;
 
-        if (
-            payload.type === "system" &&
-            payload.system_event === "room_deleted" &&
-            payload.room === state.currentRoom
-        ) {
-            await handleRoomDeleted(payload);
-            return;
-        }
-
-        if (payload.type === "typing") {
-            handleTypingPayload(payload);
-            return;
-        }
-
-        if (payload.type === "mention") {
-            handleMention(payload);
-            return;
-        }
-
-        if (payload.type === "message_edited") {
-            updateMessageInChat(payload.message);
-            return;
-        }
-
-        if (payload.type === "message_reactions_updated") {
-            updateMessageReactions(payload.message_id, payload.reactions);
-            return;
-        }
-
-        if (payload.type === "message_deleted") {
-            removeMessageFromChat(payload.message_id);
-            toggleChatEmptyState();
-            return;
-        }
-
-        if (payload.type === "system") {
-            if (["joined", "left"].includes(payload.system_event)) {
-                refreshMentionUsers();
-
-                if (usersPopupIsOpen()) {
-                    loadRoomUsers();
-                }
-            }
-
-            addMessage(payload);
-            return;
-        }
-
-        maybeNotify(payload);
-
-        addMessage(payload);
-
-        if (usersPopupIsOpen()) {
-            loadRoomUsers();
-        }
+        await handler(payload, socket);
     };
 
     socket.onclose = () => {

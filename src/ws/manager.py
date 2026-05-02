@@ -37,9 +37,9 @@ class ConnectionManager:
             return
 
         if len(connections) < self.concurrent_threshold:
-            dead = await self._broadcast_sequential(data, room, connections)
+            dead = await self._broadcast_sequential(data, connections)
         else:
-            dead = await self._broadcast_concurrent(data, room, connections)
+            dead = await self._broadcast_concurrent(data, connections)
 
         for conn in dead:
             self.disconnect(conn, room)
@@ -52,16 +52,23 @@ class ConnectionManager:
     ):
         connections = self.active_connections.get(room, [])
 
-        for conn in connections:
+        dead = []
+
+        for conn in list(connections):
             if getattr(conn.state, "username", None) != username:
                 continue
 
-            await self._send_safe(conn, data)
+            ok = await self._send_safe(conn, data)
+
+            if not ok:
+                dead.append(conn)
+
+        for conn in dead:
+            self.disconnect(conn, room)
 
     async def _broadcast_sequential(
         self,
         data: dict,
-        room: str,
         connections: list[WebSocket],
     ) -> list[WebSocket]:
         dead = []
@@ -76,7 +83,6 @@ class ConnectionManager:
     async def _broadcast_concurrent(
         self,
         data: dict,
-        room: str,
         connections: list[WebSocket],
     ) -> list[WebSocket]:
         dead: list[WebSocket] = []
