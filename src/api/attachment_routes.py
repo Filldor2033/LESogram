@@ -1,6 +1,7 @@
 import asyncio
 import mimetypes
 import secrets
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -15,9 +16,9 @@ from services.messages import normalize_message_text, save_message, serialize_me
 from services.rooms import require_room_access
 from services.uploads import (
     build_attachment_path,
-    determine_upload_content_type,
     sanitize_filename,
     validate_image_content,
+    validate_upload_file_type,
 )
 from ws.manager import manager
 
@@ -43,6 +44,7 @@ async def get_attachment(
     del username
 
     file_path = build_attachment_path(message.media_url)
+
     if not file_path or not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Attachment not found")
 
@@ -83,6 +85,7 @@ async def upload_attachment(
     )
 
     username = await require_room_access(room, room_token, db)
+
     if username != current_user.username:
         raise HTTPException(status_code=403, detail="No access to this room")
 
@@ -92,13 +95,11 @@ async def upload_attachment(
     caption = normalize_message_text(text, allow_empty=True)
     safe_filename = sanitize_filename(file.filename)
 
-    mime_type = (
+    declared_mime = (
         file.content_type
         or mimetypes.guess_type(safe_filename)[0]
         or "application/octet-stream"
     ).lower()
-
-    content_type = determine_upload_content_type(safe_filename, mime_type)
 
     content = await file.read(MAX_UPLOAD_SIZE + 1)
     await file.close()
@@ -112,14 +113,14 @@ async def upload_attachment(
             detail=f"Attachment is too large. Max size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
         )
 
+    mime_type, content_type = validate_upload_file_type(
+        safe_filename,
+        declared_mime,
+        content,
+    )
+
     if content_type == "image":
         validate_image_content(content)
-
-    suffix = Path(safe_filename).suffix[:20]
-    stored_name = f"{secrets.token_hex(16)}{suffix}"
-    stored_path = UPLOADS_DIR / stored_name
-
-    await asyncio.to_thread(stored_path.write_bytes, content)
 
     if reply_to_id is not None:
         reply_result = await db.execute(
@@ -131,6 +132,12 @@ async def upload_attachment(
 
         if not reply_result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Reply message not found")
+
+    suffix = Path(safe_filename).suffix.lower()[:20]
+    stored_name = f"{secrets.token_hex(16)}{suffix}"
+    stored_path = UPLOADS_DIR / stored_name
+
+    await asyncio.to_thread(stored_path.write_bytes, content)
 
     message = await save_message(
         db,

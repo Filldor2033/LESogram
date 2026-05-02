@@ -4,8 +4,9 @@ from fastapi import HTTPException
 import services.uploads as uploads_module
 from services.uploads import (
     build_attachment_path,
-    determine_upload_content_type,
+    detect_mime_by_magic,
     sanitize_filename,
+    validate_upload_file_type,
 )
 from tests.helpers import create_room_and_join, register
 
@@ -33,35 +34,144 @@ def test_sanitize_filename_parametrized(input_name, expected):
     assert sanitize_filename(input_name) == expected
 
 
-def test_determine_upload_content_type_blocked_types():
-    # with pytest.raises(HTTPException) as exc:
-    #     determine_upload_content_type("anim.gif", "image/gif")
-    # assert "GIF" in exc.value.detail
-
-    with pytest.raises(HTTPException):
-        determine_upload_content_type("script.exe", "application/x-msdownload")
-
-    with pytest.raises(HTTPException):
-        determine_upload_content_type("page.html", "text/html")
-
-    with pytest.raises(HTTPException):
-        determine_upload_content_type("weird.xyz", "application/x-unknown")
+@pytest.mark.parametrize(
+    "content, expected",
+    [
+        (b"\xff\xd8\xff\xe0" + b"x" * 20, "image/jpeg"),
+        (b"\x89PNG\r\n\x1a\n" + b"x" * 20, "image/png"),
+        (b"GIF89a" + b"x" * 20, "image/gif"),
+        (b"RIFFxxxxWEBP" + b"x" * 20, "image/webp"),
+        (b"%PDF-1.7\n" + b"x" * 20, "application/pdf"),
+        (b"PK\x03\x04" + b"x" * 20, "application/zip"),
+        (b"7z\xbc\xaf\x27\x1c" + b"x" * 20, "application/x-7z-compressed"),
+        (b"Rar!\x1a\x07\x00" + b"x" * 20, "application/vnd.rar"),
+        (b"hello world", "text/plain"),
+    ],
+)
+def test_detect_mime_by_magic(content, expected):
+    assert detect_mime_by_magic(content) == expected
 
 
 @pytest.mark.parametrize(
-    "filename, mime_type, expected_detail",
+    "filename, declared_mime, content, expected_mime, expected_content_type",
     [
-        # ("anim.gif", "image/gif", "GIF uploads are disabled"),
-        ("script.exe", "application/x-msdownload", "File type is not allowed"),
-        ("page.html", "text/html", "File type is not allowed"),
-        ("code.js", "application/javascript", "File type is not allowed"),
-        ("image.svg", "image/svg+xml", "File type is not allowed"),
-        ("unknown.xyz", "application/x-unknown", "File type is not allowed"),
+        (
+            "photo.jpg",
+            "image/jpeg",
+            b"\xff\xd8\xff\xe0" + b"x" * 20,
+            "image/jpeg",
+            "image",
+        ),
+        (
+            "image.png",
+            "image/png",
+            b"\x89PNG\r\n\x1a\n" + b"x" * 20,
+            "image/png",
+            "image",
+        ),
+        (
+            "anim.gif",
+            "image/gif",
+            b"GIF89a" + b"x" * 20,
+            "image/gif",
+            "image",
+        ),
+        (
+            "doc.pdf",
+            "application/pdf",
+            b"%PDF-1.7\n" + b"x" * 20,
+            "application/pdf",
+            "file",
+        ),
+        (
+            "text.txt",
+            "text/plain",
+            b"hello world",
+            "text/plain",
+            "file",
+        ),
+        (
+            "archive.zip",
+            "application/zip",
+            b"PK\x03\x04" + b"x" * 20,
+            "application/zip",
+            "file",
+        ),
+        (
+            "document.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            b"PK\x03\x04" + b"x" * 20,
+            "application/octet-stream",
+            "file",
+        ),
     ],
 )
-def test_determine_upload_content_type_rejects(filename, mime_type, expected_detail):
+def test_validate_upload_file_type_accepts(
+    filename,
+    declared_mime,
+    content,
+    expected_mime,
+    expected_content_type,
+):
+    mime_type, content_type = validate_upload_file_type(
+        filename,
+        declared_mime,
+        content,
+    )
+
+    assert mime_type == expected_mime
+    assert content_type == expected_content_type
+
+
+@pytest.mark.parametrize(
+    "filename, declared_mime, content, expected_detail",
+    [
+        (
+            "script.exe",
+            "application/x-msdownload",
+            b"MZ" + b"x" * 20,
+            "File extension is not allowed",
+        ),
+        (
+            "page.html",
+            "text/html",
+            b"<html></html>",
+            "File extension is not allowed",
+        ),
+        (
+            "code.js",
+            "application/javascript",
+            b"alert(1)",
+            "File extension is not allowed",
+        ),
+        (
+            "image.svg",
+            "image/svg+xml",
+            b"<svg></svg>",
+            "File extension is not allowed",
+        ),
+        (
+            "unknown.xyz",
+            "application/x-unknown",
+            b"\x00\x01\x02\x03",
+            "File type is not allowed",
+        ),
+        (
+            "fake.jpg",
+            "image/jpeg",
+            b"%PDF-1.7\n" + b"x" * 20,
+            "File type is not allowed",
+        ),
+    ],
+)
+def test_validate_upload_file_type_rejects(
+    filename,
+    declared_mime,
+    content,
+    expected_detail,
+):
     with pytest.raises(HTTPException) as exc:
-        determine_upload_content_type(filename, mime_type)
+        validate_upload_file_type(filename, declared_mime, content)
 
     assert exc.value.status_code == 400
     assert expected_detail in exc.value.detail
