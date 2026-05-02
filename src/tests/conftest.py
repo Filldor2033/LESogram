@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 import api.deps as deps
 import core.lifespan as lifespan_module
+import core.schema_migrations as schema_migrations
 import main
 import services.uploads as uploads_module
 import ws.routes as ws_routes
@@ -62,6 +63,7 @@ def client(session_factory, tmp_path, monkeypatch):
     uploads_dir.mkdir()
 
     monkeypatch.setattr(lifespan_module, "engine", test_engine)
+    monkeypatch.setattr(schema_migrations, "engine", test_engine)
     monkeypatch.setattr(uploads_module, "UPLOADS_DIR", uploads_dir)
     monkeypatch.setattr(ws_routes, "SessionLocal", TestingSessionLocal)
 
