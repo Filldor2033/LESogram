@@ -10,17 +10,21 @@ class ConnectionManager:
     def __init__(self, concurrent_threshold: int = 10):
         self.active_connections: dict[str, set[WebSocket]] = defaultdict(set)
         self.concurrent_threshold = concurrent_threshold
+        self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, room: str):
         await websocket.accept()
-        self.active_connections[room].add(websocket)
+        
+        async with self._lock:
+            self.active_connections[room].add(websocket)
 
-    def disconnect(self, websocket: WebSocket, room: str):
-        if room in self.active_connections:
-            self.active_connections[room].discard(websocket)
+    async def disconnect(self, websocket: WebSocket, room: str):
+        async with self._lock:
+            if room in self.active_connections:
+                self.active_connections[room].discard(websocket)
 
-            if not self.active_connections[room]:
-                del self.active_connections[room]
+                if not self.active_connections[room]:
+                    del self.active_connections[room]
 
     async def broadcast_json(
         self,
@@ -30,22 +34,29 @@ class ConnectionManager:
     ):
         text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
 
-        connections = [
-            conn
-            for conn in list(self.active_connections.get(room, set()))
-            if conn.client_state == WebSocketState.CONNECTED and conn is not exclude
-        ]
+        async with self._lock:
+            connections = [
+                conn
+                for conn in self.active_connections.get(room, set()).copy()
+                if conn is not exclude
+            ]
 
         if not connections:
             return
 
-        if len(connections) < self.concurrent_threshold:
-            dead = await self._broadcast_text_sequential(text, connections)
-        else:
-            dead = await self._broadcast_text_concurrent(text, connections)
+        results = await asyncio.gather(
+            *(self._send_text_safe(conn, text) for conn in connections),
+            return_exceptions=True,
+        )
+
+        dead = [
+            conn
+            for conn, result in zip(connections, results)
+            if result is not True
+        ]
 
         for conn in dead:
-            self.disconnect(conn, room)
+            await self.disconnect(conn, room)
 
     async def send_personal_json(
         self,
@@ -54,7 +65,10 @@ class ConnectionManager:
         username: str,
     ):
         text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-        connections = list(self.active_connections.get(room, []))
+
+        async with self._lock:
+            connections = list(self.active_connections.get(room, set()).copy())
+
         dead = []
 
         for conn in connections:
@@ -67,38 +81,7 @@ class ConnectionManager:
                 dead.append(conn)
 
         for conn in dead:
-            self.disconnect(conn, room)
-
-    async def _broadcast_text_sequential(
-        self,
-        text: str,
-        connections: list[WebSocket],
-    ) -> list[WebSocket]:
-        dead = []
-
-        for conn in connections:
-            ok = await self._send_text_safe(conn, text)
-
-            if not ok:
-                dead.append(conn)
-
-        return dead
-
-    async def _broadcast_text_concurrent(
-        self,
-        text: str,
-        connections: list[WebSocket],
-    ) -> list[WebSocket]:
-        results = await asyncio.gather(
-            *(self._send_text_safe(conn, text) for conn in connections),
-            return_exceptions=True,
-        )
-
-        return [
-            conn
-            for conn, result in zip(connections, results)
-            if result is not True
-        ]
+            await self.disconnect(conn, room)
 
     async def _send_text_safe(
         self,
@@ -106,7 +89,7 @@ class ConnectionManager:
         text: str,
     ) -> bool:
         try:
-            await asyncio.wait_for(websocket.send_text(text), timeout=3.0)
+            await asyncio.wait_for(websocket.send_text(text), timeout=1.0)
             return True
         except Exception:
             return False

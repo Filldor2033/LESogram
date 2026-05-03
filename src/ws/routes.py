@@ -71,6 +71,10 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         return
 
     username, user = await authenticate_websocket(websocket, room)
+    
+    if not username or not user:
+        await websocket.close(code=1008)
+        return
 
     is_admin = bool(user.is_admin)
 
@@ -131,7 +135,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat_task
         
-        manager.disconnect(websocket, room)
+        await manager.disconnect(websocket, room)
 
         went_offline = False
 
