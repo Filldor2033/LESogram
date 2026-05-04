@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_current_user_model, get_db
 from auth import create_access_token, hash_password, verify_password
+from core.config import ROOM_NAME_RE
 from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from models import Message, Room, User
 from schemas import CreateRoomRequest, JoinRoomRequest
@@ -56,6 +57,12 @@ async def create_room(
     )
 
     room_name = payload.name.strip()
+    
+    if not ROOM_NAME_RE.match(room_name):
+        raise HTTPException(
+            status_code=400,
+            detail="Room name can contain only letters, numbers, spaces, _ and -",
+        )
 
     result = await db.execute(select(Room).where(Room.name == room_name))
     existing = result.scalar_one_or_none()

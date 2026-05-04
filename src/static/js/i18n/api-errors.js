@@ -16,6 +16,7 @@ const API_DETAIL_MAP = {
     "GIF uploads are disabled": "apiGifDisabled",
     "Attachment is empty": "apiAttachmentEmpty",
     "Message cannot be empty": "apiMessageEmpty",
+    "Room name can contain only letters, numbers, spaces, _ and -": "apiInvalidRoomName",
     "Only the author can edit this message": "onlyAuthorCanEdit",
 };
 

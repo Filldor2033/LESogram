@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -9,6 +10,8 @@ MAX_MESSAGE_LENGTH = 1000
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 
 MAX_IMAGE_PIXELS = 20_000_000
+
+ROOM_NAME_RE = re.compile(r"^[a-zA-Zа-яА-Я0-9 _-]{1,40}$")
 
 ALLOWED_AUDIO_MIME_TYPES = {
     "audio/mpeg",
