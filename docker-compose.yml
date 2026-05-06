@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lesogram-app
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: change-me-in-production
+      DATABASE_URL: sqlite+aiosqlite:////app/data/chat.db
+    volumes:
+      - lesogram_data:/app/data
+      - lesogram_uploads:/app/src/uploads
+    restart: unless-stopped
+
+volumes:
+  lesogram_data:
+  lesogram_uploads:
