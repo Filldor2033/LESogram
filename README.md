@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="screenshots/icon.png" width="200px">
+<img src="screenshots/icon.png" width="500px">
 
 # 💬 LESogram
 
