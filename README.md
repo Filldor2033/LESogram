@@ -1,5 +1,6 @@
 <div align="center">
 
+<img src="screenshots/icon.png" width="200px">
 
 # 💬 LESogram
 
