@@ -93,7 +93,10 @@ async def upload_attachment(
         raise HTTPException(status_code=400, detail="Attachment is missing a file name")
 
     caption = normalize_message_text(text, allow_empty=True)
+
     safe_filename = sanitize_filename(file.filename)
+    if not safe_filename:
+        raise HTTPException(status_code=400, detail="Invalid file name")
 
     declared_mime = (
         file.content_type
@@ -101,43 +104,73 @@ async def upload_attachment(
         or "application/octet-stream"
     ).lower()
 
-    content = await file.read(MAX_UPLOAD_SIZE + 1)
-    await file.close()
+    suffix = Path(safe_filename).suffix.lower()[:20]
+    stored_name = f"{secrets.token_hex(16)}{suffix}"
+    stored_path = UPLOADS_DIR / stored_name
 
-    if not content:
-        raise HTTPException(status_code=400, detail="Attachment is empty")
+    total_size = 0
+    CHUNK_SIZE = 1024 * 1024  # 1MB
 
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Attachment is too large. Max size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
-        )
+    try:
+        with open(stored_path, "wb") as f:
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+
+                total_size += len(chunk)
+
+                if total_size > MAX_UPLOAD_SIZE:
+                    f.truncate(0)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Max size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
+                    )
+
+                f.write(chunk)
+        if total_size == 0:
+            try:
+                stored_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+            raise HTTPException(
+                status_code=400,
+                detail="Attachment is empty",
+            )
+
+    except Exception:
+        try:
+            if stored_path.exists():
+                stored_path.unlink()
+        except Exception:
+            pass
+        raise
+
+    finally:
+        await file.close()
+
+    file_bytes = stored_path.read_bytes()
 
     mime_type, content_type = validate_upload_file_type(
         safe_filename,
         declared_mime,
-        content,
+        file_bytes,
     )
 
     if content_type == "image":
-        validate_image_content(content)
+        validate_image_content(file_bytes)
 
     if reply_to_id is not None:
         reply_result = await db.execute(
-            select(Message).where(
+            select(Message.id).where(
                 Message.id == reply_to_id,
                 Message.room == room,
             )
         )
 
-        if not reply_result.scalar_one_or_none():
+        if reply_result.scalar_one_or_none() is None:
             raise HTTPException(status_code=400, detail="Reply message not found")
-
-    suffix = Path(safe_filename).suffix.lower()[:20]
-    stored_name = f"{secrets.token_hex(16)}{suffix}"
-    stored_path = UPLOADS_DIR / stored_name
-
-    await asyncio.to_thread(stored_path.write_bytes, content)
 
     message = await save_message(
         db,
@@ -148,7 +181,7 @@ async def upload_attachment(
         media_url=f"/uploads/{stored_name}",
         file_name=safe_filename,
         mime_type=mime_type,
-        file_size=len(content),
+        file_size=total_size,
         reply_to_id=reply_to_id,
     )
 
