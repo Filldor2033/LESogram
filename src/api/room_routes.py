@@ -2,7 +2,6 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import delete, select
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_current_user_model, get_db
@@ -13,7 +12,7 @@ from models import Message, MessageReaction, Room, User
 from schemas import CreateRoomRequest, JoinRoomRequest
 from services.permissions import can_delete_room, can_skip_room_password
 from services.rooms import build_system_payload, require_room_access, room_members
-from services.uploads import remove_room_uploads
+from services.uploads import collect_upload_paths, remove_upload_files
 from ws.manager import manager
 
 router = APIRouter()
@@ -194,7 +193,7 @@ async def delete_room(
     room_result = await db.execute(select(Message).where(Message.room == room_name))
     messages = list(room_result.scalars().all())
 
-    remove_room_uploads(messages)
+    upload_paths = collect_upload_paths(messages)
 
     message_ids = [m.id for m in messages]
     if message_ids:
@@ -211,9 +210,15 @@ async def delete_room(
         build_system_payload(room_name, current_user.username, "room_deleted"),
         room_name,
     )
-    await asyncio.sleep(0)
+
+    for _ in range(5):
+        await asyncio.sleep(0)  # skip a few event loop iterations
 
     await manager.close_room(room_name)
     room_members.pop(room_name, None)
+
+    await asyncio.sleep(0.1)
+
+    remove_upload_files(upload_paths)
 
     return {"status": "deleted", "room": room_name}

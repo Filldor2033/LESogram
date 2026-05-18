@@ -1,8 +1,9 @@
+import time
 import mimetypes
 from io import BytesIO
 from pathlib import Path
 
-from fastapi import HTTPException
+from fastapi import HTTPException, logger
 from PIL import Image, UnidentifiedImageError
 
 from core.config import *
@@ -160,18 +161,42 @@ def build_attachment_path(media_url: str | None) -> Path | None:
     return candidate
 
 
-def remove_room_uploads(messages: list[Message]):
+def collect_upload_paths(messages: list[Message]) -> list[Path]:
+    paths = []
     for message in messages:
         candidate = build_attachment_path(message.media_url)
+        if candidate:
+            paths.append(candidate)
+    return paths
 
-        if not candidate:
+
+def remove_upload_files(paths: list[Path]):
+    for path in paths:
+        if not path.exists() or not path.is_file():
             continue
+        _delete_with_retry(path)
 
-        if candidate.exists() and candidate.is_file():
-            try:
-                candidate.unlink()
-            except OSError:
-                pass
+
+def _delete_with_retry(path: Path, attempts: int = 5, base_delay: float = 0.3):
+    for attempt in range(attempts):
+        try:
+            path.unlink()
+            return
+        except OSError as e:
+            if attempt == attempts - 1:
+                logger.logger.error(
+                    "Failed to delete upload %s after %d attempts: %s",
+                    path,
+                    attempts,
+                    e,
+                )
+                return
+            time.sleep(base_delay * (2**attempt))  # 0.3, 0.6, 1.2, 2.4 sec
+
+
+def remove_room_uploads(messages: list[Message]):
+    paths = collect_upload_paths(messages)
+    remove_upload_files(paths)
 
 
 def validate_image_content(content: bytes) -> None:
