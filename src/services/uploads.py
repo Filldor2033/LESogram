@@ -1,3 +1,4 @@
+import string
 import time
 import mimetypes
 from io import BytesIO
@@ -31,51 +32,132 @@ def sanitize_filename(filename: str | None) -> str:
 
 
 def detect_mime_by_magic(head: bytes) -> str | None:
+    if not head:
+        return None
 
+    # Images
     if head.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
 
     if head.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
 
-    if head.startswith(b"GIF87a") or head.startswith(b"GIF89a"):
+    if head.startswith((b"GIF87a", b"GIF89a")):
         return "image/gif"
 
     if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WEBP":
         return "image/webp"
 
-    if head.startswith(b"ID3"):
-        return "audio/mpeg"
+    if head.startswith(b"BM"):
+        return "image/bmp"
 
-    if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0:
-        return "audio/mpeg"
+    if head.startswith((b"II*\x00", b"MM\x00*")):
+        return "image/tiff"
 
-    if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WAVE":
-        return "audio/wav"
+    if head.startswith(b"\x00\x00\x01\x00"):
+        return "image/x-icon"
 
-    if head.startswith(b"OggS"):
-        return "audio/ogg"
-
-    if head.startswith(b"fLaC"):
-        return "audio/flac"
-
-    if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xF6) == 0xF0:
-        return "audio/aac"
-
+    # ISO base media file format
+    # MP4 / MOV / HEIC / AVIF / M4A
     if len(head) >= 12 and head[4:8] == b"ftyp":
         brand = head[8:12]
+
+        video_brands = {
+            b"isom",
+            b"iso2",
+            b"iso3",
+            b"iso4",
+            b"iso5",
+            b"iso6",
+            b"mp41",
+            b"mp42",
+            b"avc1",
+            b"dash",
+            b"MSNV",
+        }
+
+        audio_brands = {
+            b"M4A ",
+            b"M4B ",
+            b"M4P ",
+        }
+
+        heic_brands = {
+            b"heic",
+            b"heix",
+            b"hevc",
+            b"hevx",
+            b"mif1",
+            b"msf1",
+        }
 
         if brand == b"qt  ":
             return "video/quicktime"
 
-        if brand in {b"M4A ", b"M4B "}:
+        if brand in audio_brands:
             return "audio/mp4"
 
-        return "video/mp4"
+        if brand in heic_brands:
+            return "image/heic"
+
+        if brand == b"avif":
+            return "image/avif"
+
+        if brand in video_brands:
+            return "video/mp4"
+
+    # Audio
+    if head.startswith(b"ID3"):
+        return "audio/mpeg"
+
+    # MP3 frame sync
+    if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0:
+        return "audio/mpeg"
+
+    # WAV
+    if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
+
+    # FLAC
+    if head.startswith(b"fLaC"):
+        return "audio/flac"
+
+    # OGG
+    if head.startswith(b"OggS"):
+        return "application/ogg"
+
+    # AAC ADTS
+    if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xF6) == 0xF0:
+        return "audio/aac"
+
+    # MIDI
+    if head.startswith(b"MThd"):
+        return "audio/midi"
+
+    # ==============
+    # Video formats
+    # ==============
+    
+    # Matroska / WebM
+    if head.startswith(b"\x1A\x45\xDF\xA3"):
+        return "video/x-matroska"
+
+    # AVI
+    if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"AVI ":
+        return "video/x-msvideo"
+
+    # FLV
+    if head.startswith(b"FLV\x01"):
+        return "video/x-flv"
+
+    # =========================
+    # Documents
+    # =========================
 
     if head.startswith(b"%PDF-"):
         return "application/pdf"
 
+    # ZIP / Office OpenXML
     if (
         head.startswith(b"PK\x03\x04")
         or head.startswith(b"PK\x05\x06")
@@ -83,20 +165,55 @@ def detect_mime_by_magic(head: bytes) -> str | None:
     ):
         return "application/zip"
 
+    # RAR
+    if head.startswith(b"Rar!\x1a\x07\x00") or head.startswith(
+        b"Rar!\x1a\x07\x01\x00"
+    ):
+        return "application/vnd.rar"
+
+    # 7z
     if head.startswith(b"7z\xbc\xaf\x27\x1c"):
         return "application/x-7z-compressed"
 
-    if head.startswith(b"Rar!\x1a\x07\x00") or head.startswith(b"Rar!\x1a\x07\x01\x00"):
-        return "application/vnd.rar"
+    # GZIP
+    if head.startswith(b"\x1f\x8b"):
+        return "application/gzip"
 
+    # ELF
+    if head.startswith(b"\x7fELF"):
+        return "application/x-elf"
+
+    # Windows EXE/DLL
+    if head.startswith(b"MZ"):
+        return "application/x-msdownload"
+
+    # Old Microsoft Office (OLE)
     if head.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
-        return "application/octet-stream"
+        return "application/vnd.ms-office"
+
+    # SQLite
+    if head.startswith(b"SQLite format 3\x00"):
+        return "application/vnd.sqlite3"
+
+    # =========================
+    # Text
+    # =========================
 
     try:
-        head.decode("utf-8")
-        return "text/plain"
+        text = head.decode("utf-8")
+
+        printable_ratio = sum(
+            ch in string.printable
+            for ch in text
+        ) / max(len(text), 1)
+
+        if printable_ratio > 0.95:
+            return "text/plain"
+
     except UnicodeDecodeError:
-        return None
+        pass
+
+    return None
 
 
 def validate_upload_file_type(

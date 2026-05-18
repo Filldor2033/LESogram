@@ -154,7 +154,7 @@ def test_validate_upload_file_type_accepts(
             "unknown.xyz",
             "application/x-unknown",
             b"\x00\x01\x02\x03",
-            "File type is not allowed",
+            "Unknown or unsupported file type",
         ),
         (
             "fake.jpg",
