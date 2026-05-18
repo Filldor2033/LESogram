@@ -205,9 +205,8 @@ async def delete_room(
         room_name,
     )
     await asyncio.sleep(0)
-    await manager.close_room(room_name)
 
-    room_members.pop(room_name, None)
     await manager.close_room(room_name)
+    room_members.pop(room_name, None)
 
     return {"status": "deleted", "room": room_name}
