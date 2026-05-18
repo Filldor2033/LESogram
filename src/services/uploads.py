@@ -43,7 +43,7 @@ def detect_mime_by_magic(content: bytes) -> str | None:
 
     if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WEBP":
         return "image/webp"
-    
+
     if head.startswith(b"ID3"):
         return "audio/mpeg"
 
@@ -76,7 +76,11 @@ def detect_mime_by_magic(content: bytes) -> str | None:
     if head.startswith(b"%PDF-"):
         return "application/pdf"
 
-    if head.startswith(b"PK\x03\x04") or head.startswith(b"PK\x05\x06") or head.startswith(b"PK\x07\x08"):
+    if (
+        head.startswith(b"PK\x03\x04")
+        or head.startswith(b"PK\x05\x06")
+        or head.startswith(b"PK\x07\x08")
+    ):
         return "application/zip"
 
     if head.startswith(b"7z\xbc\xaf\x27\x1c"):
@@ -119,7 +123,7 @@ def validate_upload_file_type(
 
     if detected_mime in ALLOWED_VIDEO_MIME_TYPES:
         return detected_mime, "video"
-    
+
     if detected_mime in ALLOWED_AUDIO_MIME_TYPES:
         return detected_mime, "file"
 

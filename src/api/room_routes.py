@@ -57,7 +57,7 @@ async def create_room(
     )
 
     room_name = payload.name.strip()
-    
+
     if not ROOM_NAME_RE.match(room_name):
         raise HTTPException(
             status_code=400,

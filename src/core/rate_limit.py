@@ -88,7 +88,6 @@ class SlidingWindowRateLimiter:
 
 
 rate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
-duplicate_limiter = SlidingWindowRateLimiter(cleanup_interval=120)
 
 
 def get_client_ip_from_request(request: Request) -> str:
@@ -96,7 +95,11 @@ def get_client_ip_from_request(request: Request) -> str:
 
 
 def get_client_ip_from_websocket(websocket: WebSocket) -> str:
-    return websocket.client.host if websocket.client and websocket.client.host else "unknown"
+    return (
+        websocket.client.host
+        if websocket.client and websocket.client.host
+        else "unknown"
+    )
 
 
 async def enforce_http_rate_limit(
@@ -165,20 +168,3 @@ def normalize_message_for_spam(text: str) -> str:
 def message_fingerprint(text: str) -> str:
     normalized = normalize_message_for_spam(text)
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
-
-
-async def check_duplicate_message_limit(
-    room: str,
-    username: str,
-    text: str,
-    limit: int = 2,
-    window_seconds: int = 30,
-) -> int | None:
-    fingerprint = message_fingerprint(text)
-
-    return await duplicate_limiter.hit(
-        "duplicate_message",
-        f"{room}:{username}:{fingerprint}",
-        limit,
-        window_seconds,
-    )

@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from fastapi import WebSocket
 
 
-@dataclass(eq=False)
+@dataclass(slots=True, eq=False)
 class ClientConnection:
     websocket: WebSocket
-    queue: asyncio.Queue[str]
-    sender_task: asyncio.Task
+    room: str
+    queue: asyncio.Queue[str | None]
+    sender_task: asyncio.Task | None
+    closed: bool = False
 
 
 class ConnectionManager:
@@ -21,43 +23,64 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket, room: str):
         await websocket.accept()
-        
-        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=self.queue_size)
-        sender_task = asyncio.create_task(self._sender_loop(websocket, queue))
-        
+
+        queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=self.queue_size)
+
         connection = ClientConnection(
-            websocket=websocket,
-            queue=queue,
-            sender_task=sender_task
+            websocket=websocket, room=room, queue=queue, sender_task=None
         )
-        
+
+        sender_task = asyncio.create_task(self._sender_loop(connection))
+
+        connection.sender_task = sender_task
+
         websocket.state.connection = connection
-        
+
         async with self._lock:
             self.active_connections[room].add(connection)
 
-    async def disconnect(self, websocket: WebSocket, room: str):
+    async def disconnect(self, websocket: WebSocket, code: int = 1000):
         connection: ClientConnection | None = getattr(
             websocket.state,
             "connection",
             None,
         )
 
-        if not connection:
-            return
-
         async with self._lock:
-            if room in self.active_connections:
-                self.active_connections[room].discard(connection)
+            if not connection or connection.closed:
+                return
 
-                if not self.active_connections[room]:
-                    del self.active_connections[room]
+            connection.closed = True
 
-        connection.sender_task.cancel()
+            room_connections = self.active_connections.get(connection.room)
+
+            if room_connections:
+                room_connections.discard(connection)
+
+                if not room_connections:
+                    del self.active_connections[connection.room]
+
+        current_task = asyncio.current_task()
+
+        if connection.sender_task and connection.sender_task is not current_task:
+            try:
+                connection.queue.put_nowait(None)
+            except asyncio.QueueFull:
+                connection.sender_task.cancel()
+
+            try:
+                await connection.sender_task
+            except asyncio.CancelledError:
+                pass
+
+        websocket.state.connection = None
 
         try:
-            await connection.sender_task
-        except asyncio.CancelledError:
+            await asyncio.wait_for(
+                websocket.close(code=code),
+                timeout=2,
+            )
+        except Exception:
             pass
 
     async def broadcast_json(
@@ -83,7 +106,7 @@ class ConnectionManager:
                 dead.append(connection.websocket)
 
         for websocket in dead:
-            await self.disconnect(websocket, room)
+            await self.disconnect(websocket)
 
     async def send_personal_json(
         self,
@@ -108,29 +131,42 @@ class ConnectionManager:
                 dead.append(connection.websocket)
 
         for websocket in dead:
-            await self.disconnect(websocket, room)
-            
+            await self.disconnect(websocket)
+
     def _enqueue(self, connection: ClientConnection, text: str) -> bool:
+        if connection.closed:
+            return False
+
         try:
             connection.queue.put_nowait(text)
             return True
         except asyncio.QueueFull:
             return False
-        
+
     async def _sender_loop(
         self,
-        websocket: WebSocket,
-        queue: asyncio.Queue[str],
+        connection: ClientConnection,
     ):
-        while True:
-            text = await queue.get()
+        try:
+            while True:
+                text = await connection.queue.get()
 
-            try:
-                await asyncio.wait_for(websocket.send_text(text), timeout=1.5)
-            except Exception:
-                break
+                if text is None:
+                    break
 
-    async def _send_safe(
+                try:
+                    await asyncio.wait_for(
+                        connection.websocket.send_text(text),
+                        timeout=5,
+                    )
+                except Exception:
+                    await self.disconnect(connection.websocket)
+                    break
+
+        except asyncio.CancelledError:
+            pass
+
+    def _send_safe(
         self,
         websocket: WebSocket,
         data: dict,
@@ -151,13 +187,10 @@ class ConnectionManager:
         async with self._lock:
             connections = list(self.active_connections.get(room, set()))
 
-        for connection in connections:
-            try:
-                await connection.websocket.close(code=code)
-            except Exception:
-                pass
-
-            await self.disconnect(connection.websocket, room)
+        await asyncio.gather(
+            *(self.disconnect(c.websocket, code=code) for c in connections),
+            return_exceptions=True,
+        )
 
 
 manager = ConnectionManager()

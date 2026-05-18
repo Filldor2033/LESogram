@@ -70,9 +70,7 @@ async def add_column_if_missing(
     column_sql: str,
 ):
     if column_name not in columns:
-        await conn.exec_driver_sql(
-            f"ALTER TABLE {table_name} ADD COLUMN {column_sql}"
-        )
+        await conn.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}")
         columns.add(column_name)
 
 

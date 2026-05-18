@@ -36,14 +36,10 @@ async def authenticate_websocket(websocket: WebSocket, room: str):
         return None, None
 
     async with SessionLocal() as db:
-        user_result = await db.execute(
-            select(User).where(User.username == username)
-        )
+        user_result = await db.execute(select(User).where(User.username == username))
         user = user_result.scalar_one_or_none()
 
-        room_result = await db.execute(
-            select(Room).where(Room.name == room)
-        )
+        room_result = await db.execute(select(Room).where(Room.name == room))
         existing_room = room_result.scalar_one_or_none()
 
     if not user or not existing_room:
@@ -71,7 +67,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         return
 
     username, user = await authenticate_websocket(websocket, room)
-    
+
     if not username or not user:
         await websocket.close(code=1008)
         return
@@ -81,10 +77,8 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
     await manager.connect(websocket, room)
     websocket.state.username = username
     websocket.state.last_seen = utc_now()
-    
-    heartbeat_task = asyncio.create_task(
-        heartbeat(websocket, manager._send_safe)
-    )
+
+    heartbeat_task = asyncio.create_task(heartbeat(websocket, manager._send_safe))
 
     was_offline = room_members[room][username] == 0
     room_members[room][username] += 1
@@ -131,10 +125,10 @@ async def websocket_endpoint(websocket: WebSocket, room: str):
         print("WebSocket error:", repr(exc))
     finally:
         heartbeat_task.cancel()
-        
+
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat_task
-        
+
         await manager.disconnect(websocket, room)
 
         went_offline = False
