@@ -219,6 +219,7 @@ async def delete_room(
 
     await asyncio.sleep(0.1)
 
-    remove_upload_files(upload_paths)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, remove_upload_files, upload_paths)
 
     return {"status": "deleted", "room": room_name}

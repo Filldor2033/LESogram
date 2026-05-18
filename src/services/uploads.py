@@ -30,8 +30,7 @@ def sanitize_filename(filename: str | None) -> str:
     return safe[:255]
 
 
-def detect_mime_by_magic(content: bytes) -> str | None:
-    head = content[:512]
+def detect_mime_by_magic(head: bytes) -> str | None:
 
     if head.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
@@ -94,7 +93,7 @@ def detect_mime_by_magic(content: bytes) -> str | None:
         return "application/octet-stream"
 
     try:
-        content[:4096].decode("utf-8")
+        head.decode("utf-8")
         return "text/plain"
     except UnicodeDecodeError:
         return None
@@ -103,7 +102,7 @@ def detect_mime_by_magic(content: bytes) -> str | None:
 def validate_upload_file_type(
     filename: str,
     declared_mime: str | None,
-    content: bytes,
+    file_head: bytes,
 ) -> tuple[str, str]:
     ext = Path(filename).suffix.lower()
     declared_mime = (declared_mime or "").split(";")[0].lower().strip()
@@ -111,7 +110,7 @@ def validate_upload_file_type(
     if ext in DANGEROUS_FILE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="File extension is not allowed")
 
-    detected_mime = detect_mime_by_magic(content)
+    detected_mime = detect_mime_by_magic(file_head)
 
     if not detected_mime:
         raise HTTPException(status_code=400, detail="Unknown or unsupported file type")

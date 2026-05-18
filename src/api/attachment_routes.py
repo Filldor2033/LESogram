@@ -1,4 +1,5 @@
 import asyncio
+import aiofiles
 import mimetypes
 import secrets
 from pathlib import Path
@@ -109,10 +110,10 @@ async def upload_attachment(
     stored_path = UPLOADS_DIR / stored_name
 
     total_size = 0
-    CHUNK_SIZE = 1024 * 1024  # 1MB
+    CHUNK_SIZE = 4 * 1024 * 1024  # 4MB
 
     try:
-        with open(stored_path, "wb") as f:
+        async with aiofiles.open(stored_path, "wb") as f:
             while True:
                 chunk = await file.read(CHUNK_SIZE)
                 if not chunk:
@@ -121,13 +122,13 @@ async def upload_attachment(
                 total_size += len(chunk)
 
                 if total_size > MAX_UPLOAD_SIZE:
-                    f.truncate(0)
+                    await f.truncate(0)
                     raise HTTPException(
                         status_code=413,
                         detail=f"File too large. Max size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
                     )
 
-                f.write(chunk)
+                await f.write(chunk)
         if total_size == 0:
             try:
                 stored_path.unlink(missing_ok=True)
@@ -149,16 +150,18 @@ async def upload_attachment(
 
     finally:
         await file.close()
-
-    file_bytes = stored_path.read_bytes()
+    
+    with open(stored_path, "rb") as f:
+        file_head = f.read(512)
 
     mime_type, content_type = validate_upload_file_type(
         safe_filename,
         declared_mime,
-        file_bytes,
+        file_head,
     )
 
     if content_type == "image":
+        file_bytes = stored_path.read_bytes()
         validate_image_content(file_bytes)
 
     if reply_to_id is not None:
