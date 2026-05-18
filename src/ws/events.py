@@ -1,5 +1,10 @@
+import asyncio
+
+from sqlalchemy import select
+
 from core.config import MAX_MESSAGE_LENGTH
 from core.rate_limit import check_websocket_rate_limit
+from models import Message
 from services.messages import save_message, serialize_message
 from services.parse import extract_mentions
 from services.rooms import room_members
@@ -50,13 +55,6 @@ async def handle_message_event(
     is_admin: bool,
 ):
     text = (data.get("text") or "").strip()
-    reply_to_id = data.get("reply_to_id")
-
-    if reply_to_id is not None:
-        try:
-            reply_to_id = int(reply_to_id)
-        except (TypeError, ValueError):
-            reply_to_id = None
 
     if not text or len(text) > MAX_MESSAGE_LENGTH:
         return
@@ -71,7 +69,8 @@ async def handle_message_event(
     )
 
     if not is_admin and burst_retry_after is not None:
-        await websocket.send_json(
+        manager._send_safe(
+            websocket,
             {
                 "type": "system",
                 "text": "Too many messages too quickly",
@@ -80,7 +79,7 @@ async def handle_message_event(
                 "system_event": "rate_limited",
                 "system_actor": username,
                 "retry_after": burst_retry_after,
-            }
+            },
         )
         return
 
@@ -92,7 +91,8 @@ async def handle_message_event(
     )
 
     if not is_admin and message_retry_after is not None:
-        await websocket.send_json(
+        manager._send_safe(
+            websocket,
             {
                 "type": "system",
                 "text": "Rate limit exceeded",
@@ -101,11 +101,30 @@ async def handle_message_event(
                 "system_event": "rate_limited",
                 "system_actor": username,
                 "retry_after": message_retry_after,
-            }
+            },
         )
         return
 
+    reply_to_id = data.get("reply_to_id")
+
     async with db_factory() as db:
+        if reply_to_id is not None:
+            try:
+                reply_to_id = int(reply_to_id)
+
+                reply_result = await db.execute(
+                    select(Message).where(
+                        Message.id == reply_to_id,
+                        Message.room == room,
+                    )
+                )
+
+                if not reply_result.scalar_one_or_none():
+                    reply_to_id = None
+
+            except (TypeError, ValueError):
+                reply_to_id = None
+
         message = await save_message(
             db,
             username=username,
@@ -116,27 +135,34 @@ async def handle_message_event(
         )
 
     payload = serialize_message(message)
+
     await manager.broadcast_json(payload, room)
 
     mentions = extract_mentions(text)
 
-    valid_mentions = [
+    room_snapshot = set(room_members.get(room, {}))
+
+    valid_mentions = {
         mentioned_user
         for mentioned_user in mentions
-        if mentioned_user != username
-        and mentioned_user in room_members.get(room, {})
-    ]
+        if (mentioned_user != username and mentioned_user in room_snapshot)
+    }
 
-    for mentioned_user in valid_mentions:
-        await manager.send_personal_json(
-            {
-                "type": "mention",
-                "from": username,
-                "room": room,
-                "text": text,
-                "message": payload,
-                "timestamp": utc_now().isoformat(),
-            },
-            room,
-            mentioned_user,
-        )
+    await asyncio.gather(
+        *(
+            manager.send_personal_json(
+                {
+                    "type": "mention",
+                    "from": username,
+                    "room": room,
+                    "text": text,
+                    "message": payload,
+                    "timestamp": utc_now().isoformat(),
+                },
+                room,
+                mentioned_user,
+            )
+            for mentioned_user in valid_mentions
+        ),
+        return_exceptions=True,
+    )

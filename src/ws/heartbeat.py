@@ -15,7 +15,7 @@ async def heartbeat(websocket, send_safe):
             await websocket.close(code=1001)
             return
 
-        ok = await send_safe(
+        ok = send_safe(
             websocket,
             {
                 "type": "ping",
