@@ -5,6 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 STATIC_DIR = BASE_DIR / "static"
 UPLOADS_DIR = BASE_DIR / "uploads"
+WEB_DIR = BASE_DIR.parent / "frontend" / "dist"
 
 MAX_MESSAGE_LENGTH = 1000
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024
