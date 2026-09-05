@@ -119,6 +119,18 @@ const en = {
     apiMissingToken: "Missing token",
     apiInvalidToken: "Invalid token",
     apiUserExists: "User already exists",
+
+    apiUsernameInvalidChars: "Username can only contain Latin and Cyrillic letters, digits, spaces, and _ . -",
+
+    apiUsernameTooShort: "Username must be at least 3 characters",
+
+    apiUsernameTooLong: "Username must be at most 50 characters",
+
+    apiPasswordTooShort: "Password must be at least 4 characters",
+
+    apiPasswordTooLong: "Password must be at most 72 characters",
+
+    authRequirementsHint: "Login: 3–50 characters — letters, digits, _ . - and spaces. Password: 4–72 characters.",
     apiInvalidCredentials: "Invalid credentials",
     apiRoomExists: "Room already exists",
     apiRoomNotFound: "Room not found",
@@ -298,6 +310,18 @@ const ru = {
     apiMissingToken: "Токен отсутствует",
     apiInvalidToken: "Недействительный токен",
     apiUserExists: "Пользователь уже существует",
+
+    apiUsernameInvalidChars: "Имя пользователя может содержать только латиницу и кириллицу, цифры, пробелы и _ . -",
+
+    apiUsernameTooShort: "Имя пользователя — минимум 3 символа",
+
+    apiUsernameTooLong: "Имя пользователя — максимум 50 символов",
+
+    apiPasswordTooShort: "Пароль — минимум 4 символа",
+
+    apiPasswordTooLong: "Пароль — максимум 72 символа",
+
+    authRequirementsHint: "Логин: 3–50 символов — буквы, цифры, _ . - и пробелы. Пароль: 4–72 символа.",
     apiInvalidCredentials: "Неверные данные для входа",
     apiRoomExists: "Комната уже существует",
     apiRoomNotFound: "Комната не найдена",

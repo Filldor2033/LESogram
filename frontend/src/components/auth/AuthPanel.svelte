@@ -87,6 +87,12 @@
             autocomplete="current-password"
         />
 
+        {#if error}
+            <div class="auth-requirements">
+                {t('authRequirementsHint')}
+            </div>
+        {/if}
+
         <button
             type="button"
             disabled={loading}
