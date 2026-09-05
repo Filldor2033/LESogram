@@ -1230,6 +1230,64 @@ button:disabled {
     min-width: 0;
 }
 
+/* --- Return-to-chat banner (mobile rooms screen) --- */
+.return-to-chat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    width: 100%;
+    min-height: 46px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+
+    border-radius: 14px;
+
+    background:
+        linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(22, 163, 74, 0.10));
+    border: 1px solid rgba(34, 197, 94, 0.30);
+
+    color: #ecfdf5;
+    font-weight: bold;
+    font-size: 14px;
+
+    box-shadow: 0 8px 22px rgba(22, 163, 74, 0.16);
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        filter 0.15s ease;
+}
+
+.return-to-chat:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(22, 163, 74, 0.22);
+}
+
+.return-to-chat:active {
+    transform: scale(0.99);
+}
+
+.return-to-chat .icon {
+    color: var(--accent);
+}
+
+.return-to-chat span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * Desktop never shows the banner (the sidebar is always
+ * visible there); only the mobile rooms screen needs it.
+ */
+@media (min-width: 901px) {
+    .return-to-chat {
+        display: none;
+    }
+}
+
 .chat-room-dot {
     width: 10px;
     height: 10px;
@@ -1246,13 +1304,10 @@ button:disabled {
     gap: 2px;
 }
 
-#chatHeader,
-#chatSubheader {
+.chat-room-copy span,
+.chat-room-copy small {
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-#chatHeader {
     white-space: nowrap;
 }
 
@@ -1621,6 +1676,54 @@ body {
         pointer-events: none;
     }
 
+    /*
+     * Chat topbar on mobile: icon-only action buttons,
+     * the back button sits left of the room title, tight
+     * spacing — everything fits a 360px screen.
+     */
+    .chat-topbar {
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .mobile-back {
+        width: 38px;
+        min-width: 38px;
+        height: 38px;
+        min-height: 38px;
+        padding: 0;
+    }
+
+    .chat-room-label {
+        flex: 1;
+        gap: 8px;
+    }
+
+    .chat-room-dot {
+        display: none;
+    }
+
+    .chat-actions {
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .chat-actions .btn-label {
+        display: none;
+    }
+
+    .chat-actions .small-btn {
+        width: 38px;
+        min-width: 38px;
+        height: 38px;
+        min-height: 38px;
+        padding: 0;
+
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     #roomsSection {
         max-height: none;
         overflow-y: auto;
@@ -1774,7 +1877,14 @@ body {
      * Fullscreen: the chat takes the full viewport height,
      * the sidebar stays visible alongside it. A dedicated
      * toggle (body.fs-sidebar-hidden) collapses the sidebar
-     * to a slim rail for a distraction-free chat.
+     * for a distraction-free chat.
+     *
+     * The transition choreography: grid columns and the
+     * container width animate in sync (material-style
+     * emphasized easing), the page padding folds in over
+     * the same duration, and the chat panel's border
+     * radius relaxes to zero — one continuous motion, no
+     * jump cuts.
      */
     body.chat-fullscreen-mode {
         padding: 0;
@@ -1805,7 +1915,7 @@ body {
         border-bottom: none;
     }
 
-    /* Sidebar collapse in fullscreen: animated grid columns. */
+    /* Sidebar collapse in fullscreen. */
     body.chat-fullscreen-mode.fs-sidebar-hidden .container {
         grid-template-columns: 0px minmax(0, 1fr);
     }
@@ -1817,25 +1927,58 @@ body {
         overflow: hidden;
     }
 
+    /*
+     * Emphasized decelerate: fast start, long gentle
+     * settle — the material motion curve.
+     */
     .container {
         transition:
-            grid-template-columns 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-            width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-            max-width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-            gap 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+            grid-template-columns 0.42s cubic-bezier(0.2, 0, 0, 1),
+            width 0.42s cubic-bezier(0.2, 0, 0, 1),
+            max-width 0.42s cubic-bezier(0.2, 0, 0, 1),
+            gap 0.42s cubic-bezier(0.2, 0, 0, 1),
+            height 0.42s cubic-bezier(0.2, 0, 0, 1);
     }
 
     .panel {
         transition:
-            opacity 0.26s ease,
-            transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity 0.3s ease,
+            transform 0.4s cubic-bezier(0.2, 0, 0, 1),
+            border-radius 0.42s cubic-bezier(0.2, 0, 0, 1);
     }
 
     .chat-panel {
         transition:
-            width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-            border-radius 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-            box-shadow 0.32s ease;
+            width 0.42s cubic-bezier(0.2, 0, 0, 1),
+            border-radius 0.42s cubic-bezier(0.2, 0, 0, 1),
+            box-shadow 0.42s ease;
+    }
+
+    body {
+        transition: padding 0.42s cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    /*
+     * A whisper of depth while morphing: the chat panel
+     * lifts slightly mid-flight. Applied only during the
+     * fullscreen class flip via the mode's own selector.
+     */
+    body.chat-fullscreen-mode .chat-panel {
+        animation: fsLift 0.42s cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    @keyframes fsLift {
+        0% {
+            filter: brightness(1);
+        }
+
+        35% {
+            filter: brightness(1.04);
+        }
+
+        100% {
+            filter: brightness(1);
+        }
     }
 
     /* Sidebar toggle button: only relevant in fullscreen. */
@@ -1856,7 +1999,7 @@ body {
     }
 
     body.chat-fullscreen-mode .sidebar-toggle .icon {
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
     }
 
     body.chat-fullscreen-mode .sidebar-toggle:hover .icon {

@@ -74,6 +74,10 @@ class RoomUsersState {
         this.loading = false;
         this.error = null;
     }
+
+    close(): void {
+        this.open = false;
+    }
 }
 
 export const roomUsersState =

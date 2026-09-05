@@ -17,9 +17,20 @@
     } from '$lib/state/rooms.svelte';
 
     import {
+        chatState
+    } from '$lib/state/chat.svelte';
+
+    import {
+        uiState
+    } from '$lib/state/ui.svelte';
+
+    import {
         formatRoomCount,
         t
     } from '$lib/i18n/i18n.svelte';
+
+    import Icon
+        from '$components/common/Icon.svelte';
 
     function logout() {
         roomsState.clear();
@@ -31,6 +42,32 @@
     class="section"
     id="roomsSection"
 >
+    {#if chatState.active}
+        <button
+            class="return-to-chat"
+            type="button"
+            onclick={() =>
+                uiState
+                    .showMobileChat()}
+        >
+            <Icon
+                name="chevron-right"
+                size={16}
+            />
+
+            <span>
+                {t(
+                    'returnToChat',
+                    {
+                        room:
+                            roomsState
+                                .currentRoom
+                    }
+                )}
+            </span>
+        </button>
+    {/if}
+
     <div class="topbar">
         <div class="whoami-row">
             <b>
@@ -39,7 +76,7 @@
 
             {#if authState.isAdmin}
                 <span class="admin-badge">
-                    👑 {t('adminBadge')}
+                    {t('adminBadge')}
                 </span>
             {/if}
         </div>

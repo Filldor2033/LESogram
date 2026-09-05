@@ -25,6 +25,7 @@ export type IconName =
     | 'logout'
     | 'chevron-down'
     | 'chevron-left'
+    | 'chevron-right'
     | 'copy'
     | 'expand'
     | 'collapse';
@@ -87,6 +88,8 @@ const PATHS: Record<IconName, string> = {
         'M6 9l6 6 6-6',
     'chevron-left':
         'M15 18l-6-6 6-6',
+    'chevron-right':
+        'M9 6l6 6-6 6',
     'copy':
         'M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
     'expand':

@@ -1,61 +1,72 @@
 <script lang="ts">
     import {
-        roomsState
-    } from '$lib/state/rooms.svelte';
+        onMount
+    } from 'svelte';
 
     import {
         chatState
     } from '$lib/state/chat.svelte';
 
     import {
-        composerState
-    } from '$lib/state/composer.svelte';
+        roomsState
+    } from '$lib/state/rooms.svelte';
 
     import {
         roomUsersState
     } from '$lib/state/room-users.svelte';
 
     import {
-        uiState
-    } from '$lib/state/ui.svelte';
+        composerState
+    } from '$lib/state/composer.svelte';
 
     import {
-        closeChat
-    } from '$lib/services/chat-session';
+        uiState
+    } from '$lib/state/ui.svelte';
 
     import {
         t
     } from '$lib/i18n/i18n.svelte';
 
-    import MessageList
-        from './MessageList.svelte';
+    import {
+        closeChat
+    } from '$lib/services/chat-session';
 
     import Icon
         from '$components/common/Icon.svelte';
 
-    import TypingIndicator
-        from './TypingIndicator.svelte';
+    import NotificationButton
+        from '$components/common/NotificationButton.svelte';
+
+    import UsersPopup
+        from '$components/users/UsersPopup.svelte';
+
+    import MessageList
+        from './MessageList.svelte';
 
     import MessageContextMenu
         from './MessageContextMenu.svelte';
 
+    import TypingIndicator
+        from './TypingIndicator.svelte';
+
     import Composer
-        from '../composer/Composer.svelte';
-
-    import UsersPopup
-        from '../users/UsersPopup.svelte';
-
-    import NotificationButton
-        from '../common/NotificationButton.svelte';
+        from '$components/composer/Composer.svelte';
 
     async function toggleUsers() {
-        roomUsersState.open =
-            !roomUsersState.open;
-
         if (
             roomUsersState.open &&
             chatState.active
         ) {
+            roomUsersState.close();
+            return;
+        }
+
+        if (
+            !roomUsersState.open &&
+            chatState.active
+        ) {
+            roomUsersState.open = true;
+
             await roomUsersState.refresh(
                 chatState.room,
                 chatState.roomToken
@@ -105,27 +116,23 @@
             return;
         }
 
-        event.preventDefault();
-
-        const extension =
-            file.type.startsWith(
-                'image/'
-            )
-                ? 'png'
-                : 'file';
-
         const named =
+            file.name ||
+            `clipboard-${Date.now()}`;
+
+        const typed =
+            file.type ||
+            'application/octet-stream';
+
+        const renamed =
             new File(
                 [file],
-                file.name ||
-                `pasted-${Date.now()}.${extension}`,
-                {
-                    type: file.type
-                }
+                named,
+                { type: typed }
             );
 
         composerState
-            .setPendingFile(named);
+            .setPendingFile(renamed);
     }
 </script>
 
@@ -136,6 +143,21 @@
 <div class="chat-panel">
     <div class="header">
         <div class="chat-topbar">
+            <button
+                class="secondary small-btn mobile-back"
+                type="button"
+                title={t('showList')}
+                aria-label={t('showList')}
+                onclick={() =>
+                    uiState
+                        .showMobileRooms()}
+            >
+                <Icon
+                    name="chevron-left"
+                    size={17}
+                />
+            </button>
+
             <div class="chat-room-label">
                 <div class="chat-room-dot"></div>
 
@@ -164,38 +186,41 @@
             </div>
 
             <div class="chat-actions">
-                <button
-                    class="secondary small-btn mobile-back"
-                    type="button"
-                    title={t('showList')}
-                    aria-label={t('showList')}
-                    onclick={() =>
-                        uiState
-                            .showMobileRooms()}
-                >
-                    <Icon
-                        name="chevron-left"
-                        size={17}
-                    />
-                </button>
-
                 {#if chatState.active}
                     <button
-                        class="secondary small-btn"
+                        class="secondary small-btn users-btn"
                         type="button"
+                        title={t('users')}
+                        aria-label={t('users')}
                         onclick={() =>
                             void toggleUsers()}
                     >
-                        {t('users')}
+                        <Icon
+                            name="users"
+                            size={16}
+                        />
+
+                        <span class="btn-label">
+                            {t('users')}
+                        </span>
                     </button>
 
                     <button
-                        class="secondary small-btn"
+                        class="secondary small-btn leave-btn"
                         type="button"
+                        title={t('leaveChat')}
+                        aria-label={t('leaveChat')}
                         onclick={() =>
                             void leave()}
                     >
-                        {t('leaveChat')}
+                        <Icon
+                            name="logout"
+                            size={16}
+                        />
+
+                        <span class="btn-label">
+                            {t('leaveChat')}
+                        </span>
                     </button>
                 {/if}
 
