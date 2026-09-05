@@ -31,6 +31,12 @@ html {
     -webkit-text-size-adjust: 100%;
 }
 
+#app {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
 body {
     margin: 0;
     min-height: 100%;
@@ -641,9 +647,19 @@ select {
     height: calc(100dvh - var(--page-padding) * 2);
     min-height: 0;
 
-    display: grid;
-    grid-template-columns: minmax(300px, var(--sidebar-width)) minmax(0, 1fr);
+    display: flex;
     gap: 18px;
+}
+
+.panel {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    flex-shrink: 0;
+}
+
+.chat-panel {
+    flex: 1;
+    min-width: 0;
 }
 
 .chat-actions {
@@ -868,6 +884,18 @@ select {
 .chat-panel {
     display: flex;
     flex-direction: column;
+}
+
+/* Sidebar sizing (after the shared blocks above so these win). */
+.panel {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    flex-shrink: 0;
+}
+
+.chat-panel {
+    flex: 1;
+    min-width: 0;
 }
 
 .header {
@@ -1632,19 +1660,25 @@ body {
     .container {
         height: 100dvh;
         min-height: 0;
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr;
         gap: 0;
     }
 
     /*
      * Mobile = two screens, not a stack: rooms and chat
      * swap with a slide animation (messenger pattern).
+     * Both are absolutely stacked inside the container.
      */
+    .container {
+        position: relative;
+    }
+
     .panel,
     .chat-panel {
-        grid-area: 1 / 1;
+        position: absolute;
+        inset: 0;
 
+        width: 100%;
+        min-width: 0;
         height: 100%;
         min-height: 0;
 
@@ -1879,38 +1913,38 @@ body {
 
 @media (min-width: 901px) {
     /*
-     * Fullscreen transition choreography:
+     * Fullscreen choreography (layout is flex everywhere —
+     * nothing non-animatable ever changes):
      *
-     *  - The CHAT grows in ALL directions at once: body
-     *    padding folds away (top/right/bottom) while the
-     *    container expands to 100vw.
-     *  - The SIDEBAR slides LEFT as a whole — margin-left
-     *    interpolates pixel-perfectly, so the panel rides
-     *    off-screen instead of being crushed in place, and
-     *    the chat's left edge grows into the freed space.
-     *
-     * The grid template never changes (minmax() does not
-     * interpolate to 0px); in fullscreen the container is
-     * a flex row, where margin-based sliding works cleanly.
+     *  - The CHAT grows in ALL directions: body padding
+     *    folds away (top/right/bottom) while the container
+     *    expands to 100vw.
+     *  - The SIDEBAR slides LEFT as a whole via margin-left
+     *    (interpolates pixel-perfectly); the chat's left
+     *    edge grows into the freed space.
+     *  - The sidebar toggle inside fullscreen uses the same
+     *    slide-left technique.
      */
     body.chat-fullscreen-mode {
         padding: 0;
     }
 
+    /*
+     * width:100% (not 100vw!): the container tracks the
+     * body's content box, which grows smoothly as body
+     * padding animates to 0. With 100vw the container was
+     * wider than the content box mid-transition, forcing
+     * re-centering and an end-of-transition snap.
+     */
     body.chat-fullscreen-mode .container {
-        width: 100vw;
+        width: 100%;
         max-width: none;
         height: 100dvh;
-
-        display: flex;
         gap: 0;
         overflow: hidden;
     }
 
     body.chat-fullscreen-mode .panel {
-        width: var(--sidebar-width);
-        min-width: var(--sidebar-width);
-        flex-shrink: 0;
         margin-left: 0;
 
         border-radius: 0;
@@ -1919,19 +1953,12 @@ body {
     }
 
     body.chat-fullscreen-mode .chat-panel {
-        flex: 1;
-        min-width: 0;
-        width: auto;
         height: 100%;
         border-radius: 0;
         box-shadow: none;
     }
 
-    /*
-     * Sidebar toggle: the panel rides off-screen to the
-     * left (margin, not width), fading as it goes; the
-     * chat absorbs the freed space from the left.
-     */
+    /* Sidebar toggle: the panel rides off-screen left. */
     body.chat-fullscreen-mode.fs-sidebar-hidden .panel {
         margin-left: calc(-1 * var(--sidebar-width));
         opacity: 0;
