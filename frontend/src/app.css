@@ -1879,29 +1879,24 @@ body {
 
 @media (min-width: 901px) {
     /*
-     * Fullscreen transition — margin-based, not grid-based:
-     * the grid template NEVER changes (minmax() does not
-     * interpolate to 0px, which made the old animation jump
-     * in two discrete steps). Instead:
+     * Fullscreen transition choreography:
      *
-     *  1. the container expands to 100vw (width transition);
-     *  2. the sidebar slides out via a negative margin-left,
-     *     which interpolates pixel-perfectly;
-     *  3. the chat panel's radius relaxes to zero and its
-     *     shadow fades, in sync on one easing curve.
+     *  - The CHAT grows in ALL directions at once: body
+     *    padding folds away (top/right/bottom) while the
+     *    container expands to 100vw.
+     *  - The SIDEBAR slides LEFT as a whole — margin-left
+     *    interpolates pixel-perfectly, so the panel rides
+     *    off-screen instead of being crushed in place, and
+     *    the chat's left edge grows into the freed space.
      *
-     * The sidebar toggle inside fullscreen uses the same
-     * margin technique, so it is butter-smooth too.
+     * The grid template never changes (minmax() does not
+     * interpolate to 0px); in fullscreen the container is
+     * a flex row, where margin-based sliding works cleanly.
      */
     body.chat-fullscreen-mode {
         padding: 0;
     }
 
-    /*
-     * In fullscreen the container becomes a flex row: the
-     * sidebar's width can then interpolate pixel-perfectly
-     * (0 <-> 340px) — impossible with a minmax() grid track.
-     */
     body.chat-fullscreen-mode .container {
         width: 100vw;
         max-width: none;
@@ -1909,17 +1904,18 @@ body {
 
         display: flex;
         gap: 0;
+        overflow: hidden;
     }
 
     body.chat-fullscreen-mode .panel {
         width: var(--sidebar-width);
         min-width: var(--sidebar-width);
         flex-shrink: 0;
+        margin-left: 0;
 
         border-radius: 0;
         border-right-color: rgba(148, 163, 184, 0.16);
         box-shadow: none;
-        overflow: hidden;
     }
 
     body.chat-fullscreen-mode .chat-panel {
@@ -1931,10 +1927,13 @@ body {
         box-shadow: none;
     }
 
-    /* Sidebar toggle: collapses the sidebar width to zero. */
+    /*
+     * Sidebar toggle: the panel rides off-screen to the
+     * left (margin, not width), fading as it goes; the
+     * chat absorbs the freed space from the left.
+     */
     body.chat-fullscreen-mode.fs-sidebar-hidden .panel {
-        width: 0;
-        min-width: 0;
+        margin-left: calc(-1 * var(--sidebar-width));
         opacity: 0;
         pointer-events: none;
     }
@@ -1944,13 +1943,13 @@ body {
         transition:
             width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
             max-width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
-            height 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+            height 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            gap 0.45s cubic-bezier(0.33, 1, 0.68, 1);
     }
 
     .panel {
         transition:
-            width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
-            min-width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            margin-left 0.45s cubic-bezier(0.33, 1, 0.68, 1),
             opacity 0.32s ease,
             border-radius 0.45s cubic-bezier(0.33, 1, 0.68, 1),
             box-shadow 0.45s ease,
