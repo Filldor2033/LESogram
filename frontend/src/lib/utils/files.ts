@@ -42,25 +42,3 @@ export function formatBytes(
         }
     ).format(value)} ${UNITS[index]}`;
 }
-
-export function getFileIcon(
-    type = ''
-): string {
-    if (type.includes('pdf')) {
-        return '📄';
-    }
-
-    if (
-        type.includes('zip') ||
-        type.includes('rar') ||
-        type.includes('7z')
-    ) {
-        return '🗜️';
-    }
-
-    if (type.includes('text')) {
-        return '📝';
-    }
-
-    return '📎';
-}

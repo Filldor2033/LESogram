@@ -19,10 +19,15 @@
         t
     } from '$lib/i18n/i18n.svelte';
 
+    import Icon
+        from '$components/common/Icon.svelte';
+
     let menu = $state<HTMLDivElement>();
 
     let left = $state(0);
     let top = $state(0);
+
+    let visible = $state(false);
 
     const reactions = [
         '👍',
@@ -54,6 +59,18 @@
         )
     );
 
+    let isTouch = $derived(
+        contextMenuState.touch
+    );
+
+    $effect(() => {
+        contextMenuState.open;
+        contextMenuState.x;
+        contextMenuState.y;
+
+        void position();
+    });
+
     async function position() {
         if (
             !contextMenuState.open
@@ -61,36 +78,68 @@
             return;
         }
 
+        visible = false;
+
         await tick();
 
-        const rect =
-            menu?.getBoundingClientRect();
-
-        if (!rect) {
+        if (!menu) {
             return;
         }
 
+        /*
+         * Ensure the menu is parented to <body> BEFORE
+         * measuring: inside the chat panel the coordinates
+         * would be panel-relative (backdrop-filter creates
+         * a containing block).
+         */
+        if (menu.parentElement !== document.body) {
+            document.body.appendChild(menu);
+        }
+
+        /*
+         * offsetWidth/Height are layout sizes: unaffected by
+         * the scale() transform on the not-yet-visible menu
+         * (getBoundingClientRect would measure it shrunk).
+         */
+        const menuWidth = menu.offsetWidth;
+        const menuHeight = menu.offsetHeight;
+
         const padding = 8;
 
-        left = Math.max(
-            padding,
-            Math.min(
-                contextMenuState.x,
-                window.innerWidth -
-                rect.width -
+        left = Math.min(
+            Math.max(
+                padding,
+                contextMenuState.x
+            ),
+            window.innerWidth -
+                menuWidth -
                 padding
-            )
         );
 
-        top = Math.max(
-            padding,
-            Math.min(
-                contextMenuState.y,
-                window.innerHeight -
-                rect.height -
+        /*
+         * On touch devices the menu opens at the finger
+         * point: shift it up so the finger does not cover
+         * it.
+         */
+        const cursorShift =
+            isTouch ? 12 : 10;
+
+        top = Math.min(
+            Math.max(
+                padding,
+                contextMenuState.y -
+                    cursorShift
+            ),
+            window.innerHeight -
+                menuHeight -
                 padding
-            )
         );
+
+        await tick();
+
+        requestAnimationFrame(() => {
+            visible = true;
+        });
     }
 
     $effect(() => {
@@ -165,40 +214,19 @@
     <div
         bind:this={menu}
         class="context-menu"
+        class:visible
         style={`left:${left}px;top:${top}px`}
         onclick={(event) =>
             event.stopPropagation()}
+        role="menu"
+        tabindex="-1"
     >
-        <button
-            type="button"
-            onclick={reply}
-        >
-            {t('reply')}
-        </button>
-
-        {#if canEdit}
-            <button
-                type="button"
-                onclick={edit}
-            >
-                {t('edit')}
-            </button>
-        {/if}
-
-        {#if canDelete}
-            <button
-                type="button"
-                class="danger"
-                onclick={remove}
-            >
-                {t('delete')}
-            </button>
-        {/if}
-
         <div class="context-reactions">
-            {#each reactions as emoji}
+            {#each reactions as emoji, i}
                 <button
                     type="button"
+                    class="reaction-btn"
+                    style={`transition-delay:${i * 24}ms`}
                     onclick={() =>
                         react(emoji)}
                 >
@@ -206,5 +234,41 @@
                 </button>
             {/each}
         </div>
+
+        <div class="context-sep"></div>
+
+        <button
+            type="button"
+            class="context-action"
+            onclick={reply}
+        >
+            <Icon name="reply" />
+
+            <span>{t('reply')}</span>
+        </button>
+
+        {#if canEdit}
+            <button
+                type="button"
+                class="context-action"
+                onclick={edit}
+            >
+                <Icon name="edit" />
+
+                <span>{t('edit')}</span>
+            </button>
+        {/if}
+
+        {#if canDelete}
+            <button
+                type="button"
+                class="context-action danger"
+                onclick={remove}
+            >
+                <Icon name="trash" />
+
+                <span>{t('delete')}</span>
+            </button>
+        {/if}
     </div>
 {/if}

@@ -40,6 +40,9 @@
         t
     } from '$lib/i18n/i18n.svelte';
 
+    import Icon
+        from '$components/common/Icon.svelte';
+
     import ReplyPreview
         from './ReplyPreview.svelte';
 
@@ -482,7 +485,10 @@
             onclick={() =>
                 attachmentInput.click()}
         >
-            📎
+            <Icon
+                name="paperclip"
+                size={17}
+            />
         </button>
 
         <input
@@ -500,7 +506,7 @@
         />
 
         <button
-            style="width:120px"
+            class="send-btn"
             type="button"
             disabled={
                 !chatState.active ||
@@ -508,6 +514,11 @@
             }
             onclick={() => void send()}
         >
+            <Icon
+                name="send"
+                size={16}
+            />
+
             {t('send')}
         </button>
     </div>

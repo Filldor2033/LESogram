@@ -16,8 +16,15 @@
     } from '$lib/utils/files';
 
     import {
+        fileIconName
+    } from '$lib/icons';
+
+    import {
         t
     } from '$lib/i18n/i18n.svelte';
+
+    import Icon
+        from '$components/common/Icon.svelte';
 
     let {
         message
@@ -63,6 +70,17 @@
 
     {:else}
         <div class="msg-file">
+            <div class="msg-file-icon">
+                <Icon
+                    name={fileIconName(
+                        message.mime_type ||
+                            message.file_name ||
+                            ''
+                    )}
+                    size={30}
+                />
+            </div>
+
             <div class="msg-file-info">
                 <div class="msg-file-name">
                     {message.file_name ||
@@ -92,6 +110,11 @@
                 rel="noopener noreferrer"
                 download={message.file_name}
             >
+                <Icon
+                    name="download"
+                    size={15}
+                />
+
                 {t('download')}
             </a>
         </div>

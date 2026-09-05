@@ -30,6 +30,9 @@
     import MessageList
         from './MessageList.svelte';
 
+    import Icon
+        from '$components/common/Icon.svelte';
+
     import TypingIndicator
         from './TypingIndicator.svelte';
 
@@ -200,9 +203,14 @@
                         uiState
                             .toggleChatFullscreen()}
                 >
-                    {uiState.chatFullscreen
-                        ? '⮌'
-                        : '⛶'}
+                    <Icon
+                        name={
+                            uiState.chatFullscreen
+                                ? 'collapse'
+                                : 'expand'
+                        }
+                        size={17}
+                    />
                 </button>
             </div>
         </div>

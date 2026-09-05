@@ -4,13 +4,19 @@
     } from '$lib/state/composer.svelte';
 
     import {
-        formatBytes,
-        getFileIcon
+        formatBytes
     } from '$lib/utils/files';
+
+    import {
+        fileIconName
+    } from '$lib/icons';
 
     import {
         t
     } from '$lib/i18n/i18n.svelte';
+
+    import Icon
+        from '$components/common/Icon.svelte';
 
     let file = $derived(
         composerState.pendingFile
@@ -43,7 +49,13 @@
             {:else}
                 <div class="upload-file-preview">
                     <div class="upload-file-icon">
-                        {getFileIcon(file.type)}
+                        <Icon
+                            name={fileIconName(
+                                file.type ||
+                                    file.name
+                            )}
+                            size={26}
+                        />
                     </div>
                 </div>
             {/if}

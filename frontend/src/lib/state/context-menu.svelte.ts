@@ -9,6 +9,8 @@ class ContextMenuState {
     x = $state(0);
     y = $state(0);
 
+    touch = $state(false);
+
     get open(): boolean {
         return this.message !== null;
     }
@@ -16,16 +18,28 @@ class ContextMenuState {
     show(
         message: Message,
         x: number,
-        y: number
+        y: number,
+        touch = false
     ): void {
         this.message = message;
 
         this.x = x;
         this.y = y;
+
+        this.touch = touch;
+
+        if (touch && 'vibrate' in navigator) {
+            try {
+                navigator.vibrate(10);
+            } catch {
+                /* not supported */
+            }
+        }
     }
 
     close(): void {
         this.message = null;
+        this.touch = false;
     }
 }
 
