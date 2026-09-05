@@ -214,6 +214,83 @@ select {
     font-size: 24px;
 }
 
+/* --- Upload progress bar --- */
+.upload-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    margin-top: 8px;
+}
+
+.upload-progress-track {
+    position: relative;
+
+    flex: 1;
+    height: 8px;
+    min-width: 0;
+    border-radius: 999px;
+
+    background: rgba(148, 163, 184, 0.15);
+    border: 1px solid rgba(148, 163, 184, 0.10);
+    overflow: hidden;
+}
+
+.upload-progress-fill {
+    position: relative;
+
+    height: 100%;
+    border-radius: 999px;
+
+    background: linear-gradient(
+        90deg,
+        var(--accent-2),
+        var(--accent)
+    );
+
+    transition: width 0.18s ease;
+
+    overflow: hidden;
+}
+
+.upload-progress-shine {
+    position: absolute;
+    inset: 0;
+
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.35),
+        transparent
+    );
+
+    transform: translateX(-100%);
+
+    animation: progressShine 1.1s
+        ease-in-out infinite;
+}
+
+@keyframes progressShine {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    60%,
+    100% {
+        transform: translateX(220%);
+    }
+}
+
+.upload-progress-label {
+    min-width: 42px;
+    text-align: right;
+
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
 .typing-indicator::after {
     content: "";
     display: inline-block;
@@ -1387,21 +1464,22 @@ button:disabled {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-width: 110px;
-    padding: 9px 18px;
+    gap: 7px;
+
+    width: auto;
+    min-width: 0;
+    min-height: 44px;
+    padding: 9px 16px;
+    font-size: 14px;
+    white-space: nowrap;
 }
 
 .input-row .send-btn .icon {
     transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 }
 
-.input-row .send-btn:hover .icon {
+.input-row .send-btn:not(:disabled):hover .icon {
     transform: translateX(3px);
-}
-
-.input-row .send-btn:disabled .icon {
-    transform: none;
 }
 
 .input-row .attach-btn {
@@ -1664,17 +1742,19 @@ body {
         width: 100vw;
         max-width: none;
         height: 100dvh;
-        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+        grid-template-columns: 0px minmax(0, 1fr);
         gap: 0;
     }
 
     body.chat-fullscreen-mode .panel {
         display: flex;
         position: relative;
-        transform: none;
-        opacity: 1;
-        pointer-events: auto;
+        opacity: 0;
+        transform: translateX(-48px) scale(0.94);
+        transform-origin: left center;
+        pointer-events: none;
         border-radius: 0;
+        overflow: hidden;
     }
 
     body.chat-fullscreen-mode .chat-panel {
@@ -1690,13 +1770,43 @@ body {
         border-bottom: none;
     }
 
-    .container,
-    .panel,
+    /* Grid columns animate smoothly in modern browsers. */
+    .container {
+        transition:
+            grid-template-columns 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+            width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+            max-width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+            gap 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .panel {
+        transition:
+            margin 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+            opacity 0.26s ease,
+            transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
     .chat-panel {
         transition:
-            width 0.25s ease,
-            height 0.25s ease,
-            gap 0.25s ease,
-            border-radius 0.25s ease;
+            width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+            border-radius 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+            box-shadow 0.32s ease;
+    }
+
+    body.chat-fullscreen-mode .panel {
+        margin-left: calc(-1 * var(--sidebar-width) - var(--page-padding));
+        opacity: 0;
+        transform: translateX(-40px) scale(0.96);
+        transform-origin: left center;
+        pointer-events: none;
+    }
+
+    body:not(.chat-fullscreen-mode) .panel {
+        transition-delay: 0.05s;
+    }
+
+    .chat .msg {
+        transition:
+            max-width 0.32s cubic-bezier(0.4, 0, 0.2, 1);
     }
 }

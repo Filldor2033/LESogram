@@ -9,19 +9,111 @@ import type {
 export function sendAttachment(
     token: string,
     room: string,
-    formData: FormData
+    formData: FormData,
+    onProgress?:
+        (fraction: number) => void
 ): Promise<Message> {
-    return request<Message>(
-        `/rooms/${encodeURIComponent(room)}/attachments`,
-        {
-            method: 'POST',
+    /*
+     * fetch() cannot report upload progress; an XHR can.
+     * Falls back to request() when no progress callback is
+     * given (same error handling path).
+     */
+    if (!onProgress) {
+        return request<Message>(
+            `/rooms/${encodeURIComponent(room)}/attachments`,
+            {
+                method: 'POST',
 
-            headers: {
-                Authorization:
-                    `Bearer ${token}`
-            },
+                headers: {
+                    Authorization:
+                        `Bearer ${token}`
+                },
 
-            body: formData
+                body: formData
+            }
+        );
+    }
+
+    return new Promise<Message>(
+        (resolve, reject) => {
+            const xhr =
+                new XMLHttpRequest();
+
+            xhr.open(
+                'POST',
+                `/api/rooms/${encodeURIComponent(room)}/attachments`
+            );
+
+            xhr.setRequestHeader(
+                'Authorization',
+                `Bearer ${token}`
+            );
+
+            xhr.upload.onprogress = (
+                event
+            ) => {
+                if (
+                    event.lengthComputable
+                ) {
+                    onProgress(
+                        event.loaded /
+                        event.total
+                    );
+                }
+            };
+
+            xhr.onload = () => {
+                let data: unknown = null;
+
+                const type =
+                    xhr.getResponseHeader(
+                        'content-type'
+                    ) || '';
+
+                try {
+                    data = type.includes(
+                        'application/json'
+                    )
+                        ? JSON.parse(
+                            xhr.responseText
+                        )
+                        : xhr.responseText;
+                } catch {
+                    data = xhr.responseText;
+                }
+
+                if (
+                    xhr.status >= 200 &&
+                    xhr.status < 300
+                ) {
+                    resolve(
+                        data as Message
+                    );
+                } else {
+                    const error =
+                        new Error(
+                            `HTTP ${xhr.status}`
+                        ) as Error & {
+                            status: number;
+                            data: unknown;
+                        };
+
+                    error.status =
+                        xhr.status;
+                    error.data = data;
+
+                    reject(error);
+                }
+            };
+
+            xhr.onerror = () =>
+                reject(
+                    new Error(
+                        'Network error'
+                    )
+                );
+
+            xhr.send(formData);
         }
     );
 }

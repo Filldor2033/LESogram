@@ -228,6 +228,7 @@
         }
 
         composerState.uploading = true;
+        composerState.uploadProgress = 0;
 
         composerState.setStatus(
             'uploadingFile',
@@ -241,7 +242,14 @@
                 await sendAttachment(
                     authState.token,
                     chatState.room,
-                    form
+                    form,
+                    (fraction) => {
+                        composerState.uploadProgress =
+                            Math.round(
+                                fraction *
+                                100
+                            );
+                    }
                 );
 
             /*
@@ -269,6 +277,9 @@
         } finally {
             composerState.uploading =
                 false;
+
+            composerState.uploadProgress =
+                0;
         }
     }
 

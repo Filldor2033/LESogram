@@ -74,18 +74,56 @@
                     .filter(Boolean)
                     .join(' | ')}
             </div>
+
+            {#if composerState.uploading}
+                <div
+                    class="upload-progress"
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow={
+                        composerState
+                            .uploadProgress
+                    }
+                >
+                    <div
+                        class="upload-progress-track"
+                    >
+                        <div
+                            class="upload-progress-fill"
+                            style={`width:${
+                                composerState
+                                    .uploadProgress
+                            }%`}
+                        >
+                            <div
+                                class="upload-progress-shine"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <span
+                        class="upload-progress-label"
+                    >
+                        {composerState
+                            .uploadProgress}%
+                    </span>
+                </div>
+            {/if}
         </div>
 
         <div class="upload-preview-actions">
-            <button
-                type="button"
-                class="secondary small-btn"
-                onclick={() =>
-                    composerState
-                        .clearPendingFile()}
-            >
-                {t('cancel')}
-            </button>
+            {#if !composerState.uploading}
+                <button
+                    type="button"
+                    class="secondary small-btn"
+                    onclick={() =>
+                        composerState
+                            .clearPendingFile()}
+                >
+                    {t('cancel')}
+                </button>
+            {/if}
         </div>
     </div>
 {/if}

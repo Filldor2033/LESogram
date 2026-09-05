@@ -20,6 +20,8 @@ class ComposerState {
 
     uploading = $state(false);
 
+    uploadProgress = $state(0);
+
     statusKey =
         $state<TranslationKey | null>(null);
 
@@ -116,6 +118,7 @@ class ComposerState {
         this.clearStatus();
 
         this.uploading = false;
+        this.uploadProgress = 0;
     }
 }
 
