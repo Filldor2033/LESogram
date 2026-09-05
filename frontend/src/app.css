@@ -1772,7 +1772,8 @@ body {
 
     /* The fullscreen toggle is meaningless on mobile: hide it. */
     body.chat-fullscreen-mode .sidebar-toggle,
-    .sidebar-toggle {
+    .sidebar-toggle,
+    .fullscreen-btn {
         display: none !important;
     }
 
@@ -1878,97 +1879,93 @@ body {
 
 @media (min-width: 901px) {
     /*
-     * Fullscreen: the chat takes the full viewport height,
-     * the sidebar stays visible alongside it. A dedicated
-     * toggle (body.fs-sidebar-hidden) collapses the sidebar
-     * for a distraction-free chat.
+     * Fullscreen transition — margin-based, not grid-based:
+     * the grid template NEVER changes (minmax() does not
+     * interpolate to 0px, which made the old animation jump
+     * in two discrete steps). Instead:
      *
-     * The transition choreography: grid columns and the
-     * container width animate in sync (material-style
-     * emphasized easing), the page padding folds in over
-     * the same duration, and the chat panel's border
-     * radius relaxes to zero — one continuous motion, no
-     * jump cuts.
+     *  1. the container expands to 100vw (width transition);
+     *  2. the sidebar slides out via a negative margin-left,
+     *     which interpolates pixel-perfectly;
+     *  3. the chat panel's radius relaxes to zero and its
+     *     shadow fades, in sync on one easing curve.
+     *
+     * The sidebar toggle inside fullscreen uses the same
+     * margin technique, so it is butter-smooth too.
      */
     body.chat-fullscreen-mode {
         padding: 0;
     }
 
+    /*
+     * In fullscreen the container becomes a flex row: the
+     * sidebar's width can then interpolate pixel-perfectly
+     * (0 <-> 340px) — impossible with a minmax() grid track.
+     */
     body.chat-fullscreen-mode .container {
         width: 100vw;
         max-width: none;
         height: 100dvh;
+
+        display: flex;
         gap: 0;
     }
 
     body.chat-fullscreen-mode .panel {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        flex-shrink: 0;
+
         border-radius: 0;
         border-right-color: rgba(148, 163, 184, 0.16);
         box-shadow: none;
+        overflow: hidden;
     }
 
     body.chat-fullscreen-mode .chat-panel {
-        grid-column: 2;
-        width: 100%;
+        flex: 1;
+        min-width: 0;
+        width: auto;
         height: 100%;
         border-radius: 0;
         box-shadow: none;
     }
 
-    /* Sidebar collapse in fullscreen. */
-    body.chat-fullscreen-mode.fs-sidebar-hidden .container {
-        grid-template-columns: 0px minmax(0, 1fr);
-    }
-
+    /* Sidebar toggle: collapses the sidebar width to zero. */
     body.chat-fullscreen-mode.fs-sidebar-hidden .panel {
+        width: 0;
+        min-width: 0;
         opacity: 0;
-        transform: translateX(-48px);
         pointer-events: none;
-        overflow: hidden;
     }
 
-    /*
-     * Emphasized decelerate: fast start, long gentle
-     * settle — the material motion curve.
-     */
+    /* One easing curve for the entire choreography. */
     .container {
         transition:
-            grid-template-columns 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            width 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            max-width 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            gap 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            height 0.42s cubic-bezier(0.33, 1, 0.68, 1);
+            width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            max-width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            height 0.45s cubic-bezier(0.33, 1, 0.68, 1);
     }
 
     .panel {
         transition:
-            opacity 0.3s ease,
-            transform 0.4s cubic-bezier(0.33, 1, 0.68, 1),
-            border-radius 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            box-shadow 0.42s ease,
-            border-color 0.42s ease;
+            width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            min-width 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            opacity 0.32s ease,
+            border-radius 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            box-shadow 0.45s ease,
+            border-color 0.45s ease;
     }
 
     .chat-panel {
         transition:
-            width 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            border-radius 0.42s cubic-bezier(0.33, 1, 0.68, 1),
-            box-shadow 0.42s ease,
-            border-color 0.42s ease;
+            border-radius 0.45s cubic-bezier(0.33, 1, 0.68, 1),
+            box-shadow 0.45s ease,
+            border-color 0.45s ease;
     }
 
     body {
-        transition: padding 0.42s cubic-bezier(0.33, 1, 0.68, 1);
-    }
-
-    /*
-     * The sidebar is a full participant in the transition:
-     * its radius, border color and shadow all animate on
-     * the same curve as the container, so the whole left
-     * column morphs into its fullscreen form in one motion.
-     */
-    body.chat-fullscreen-mode .panel {
-        transform-origin: left center;
+        transition: padding 0.45s cubic-bezier(0.33, 1, 0.68, 1);
     }
 
     /* Sidebar toggle button: only relevant in fullscreen. */

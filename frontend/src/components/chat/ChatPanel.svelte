@@ -256,7 +256,7 @@
                 </button>
 
                 <button
-                    class="secondary small-btn"
+                    class="secondary small-btn fullscreen-btn"
                     type="button"
                     title={
                         uiState.chatFullscreen
