@@ -26,6 +26,10 @@
         t
     } from '$lib/i18n/i18n.svelte';
 
+    import {
+        uiState
+    } from '$lib/state/ui.svelte';
+
     let bootstrapping =
         $state(true);
 
@@ -103,7 +107,10 @@
     <title>{t('appTitle')}</title>
 </svelte:head>
 
-<div class="container">
+<div
+    class="container"
+    data-mobile-view={uiState.mobileView}
+>
     <div class="panel">
         <div class="header">
             <div class="header-row">

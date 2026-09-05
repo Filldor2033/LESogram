@@ -249,6 +249,12 @@
                                 fraction *
                                 100
                             );
+                    },
+                    (cancel) => {
+                        composerState
+                            .registerUploadCanceller(
+                                cancel
+                            );
                     }
                 );
 
@@ -270,16 +276,37 @@
                 { file: name }
             );
         } catch (error) {
-            composerState.setApiError(
-                error,
-                'uploadFailed'
-            );
+            if (
+                error instanceof
+                    DOMException &&
+                error.name ===
+                    'AbortError'
+            ) {
+                /*
+                 * User cancelled: keep the file in the
+                 * preview so it can be retried.
+                 */
+                composerState.setStatus(
+                    'uploadCancelled',
+                    {
+                        file: file.name
+                    }
+                );
+            } else {
+                composerState.setApiError(
+                    error,
+                    'uploadFailed'
+                );
+            }
         } finally {
             composerState.uploading =
                 false;
 
             composerState.uploadProgress =
                 0;
+
+            composerState
+                .clearUploadCanceller();
         }
     }
 

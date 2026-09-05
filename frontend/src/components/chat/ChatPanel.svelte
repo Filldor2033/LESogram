@@ -164,6 +164,21 @@
             </div>
 
             <div class="chat-actions">
+                <button
+                    class="secondary small-btn mobile-back"
+                    type="button"
+                    title={t('showList')}
+                    aria-label={t('showList')}
+                    onclick={() =>
+                        uiState
+                            .showMobileRooms()}
+                >
+                    <Icon
+                        name="chevron-left"
+                        size={17}
+                    />
+                </button>
+
                 {#if chatState.active}
                     <button
                         class="secondary small-btn"
@@ -185,6 +200,35 @@
                 {/if}
 
                 <NotificationButton />
+
+                <button
+                    class="secondary small-btn sidebar-toggle"
+                    type="button"
+                    title={
+                        uiState.fsSidebarHidden
+                            ? t('showList')
+                            : t('hideList')
+                    }
+                    aria-label={
+                        uiState.fsSidebarHidden
+                            ? t('showList')
+                            : t('hideList')
+                    }
+                    onclick={() =>
+                        uiState
+                            .toggleFsSidebar()}
+                >
+                    <Icon
+                        name="chevron-left"
+                        size={17}
+                        class={
+                            uiState
+                                .fsSidebarHidden
+                                ? 'flip'
+                                : ''
+                        }
+                    />
+                </button>
 
                 <button
                     class="secondary small-btn"

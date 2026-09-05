@@ -22,6 +22,33 @@ class ComposerState {
 
     uploadProgress = $state(0);
 
+    private cancelUploadFn:
+        | (() => void)
+        | null = null;
+
+    registerUploadCanceller(
+        cancel: () => void
+    ): void {
+        this.cancelUploadFn = cancel;
+    }
+
+    clearUploadCanceller(): void {
+        this.cancelUploadFn = null;
+    }
+
+    cancelUpload(): boolean {
+        if (
+            this.cancelUploadFn &&
+            this.uploading
+        ) {
+            this.cancelUploadFn();
+
+            return true;
+        }
+
+        return false;
+    }
+
     statusKey =
         $state<TranslationKey | null>(null);
 
@@ -119,6 +146,7 @@ class ComposerState {
 
         this.uploading = false;
         this.uploadProgress = 0;
+        this.cancelUploadFn = null;
     }
 }
 

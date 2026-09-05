@@ -11,7 +11,10 @@ export function sendAttachment(
     room: string,
     formData: FormData,
     onProgress?:
-        (fraction: number) => void
+        (fraction: number) => void,
+    registerCanceller?: (
+        cancel: () => void
+    ) => void
 ): Promise<Message> {
     /*
      * fetch() cannot report upload progress; an XHR can.
@@ -38,6 +41,10 @@ export function sendAttachment(
         (resolve, reject) => {
             const xhr =
                 new XMLHttpRequest();
+
+            registerCanceller?.(
+                () => xhr.abort()
+            );
 
             xhr.open(
                 'POST',
@@ -110,6 +117,14 @@ export function sendAttachment(
                 reject(
                     new Error(
                         'Network error'
+                    )
+                );
+
+            xhr.onabort = () =>
+                reject(
+                    new DOMException(
+                        'Upload cancelled',
+                        'AbortError'
                     )
                 );
 

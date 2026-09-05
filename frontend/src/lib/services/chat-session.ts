@@ -35,6 +35,10 @@ import {
     composerState
 } from '$lib/state/composer.svelte';
 
+import {
+    uiState
+} from '$lib/state/ui.svelte';
+
 async function handleRealtimeEvent(
     event: ServerEvent
 ): Promise<void> {
@@ -183,6 +187,11 @@ async function handleRoomDeleted(
     roomsState.leave();
 
     /*
+     * Mobile: the room is gone — back to the rooms screen.
+     */
+    uiState.showMobileRooms();
+
+    /*
      * В следующем улучшении status тоже
      * оформим как semantic i18n message.
      */
@@ -203,6 +212,11 @@ export async function openChat(
 
     composerState.reset();
     roomUsersState.clear();
+
+    /*
+     * Mobile: entering a room shows the chat screen.
+     */
+    uiState.showMobileChat();
 
     /*
      * 1. история
@@ -258,4 +272,9 @@ export function closeChat(): void {
     chatState.reset();
     composerState.reset();
     roomUsersState.clear();
+
+    /*
+     * Mobile: leaving a room returns to the rooms screen.
+     */
+    uiState.showMobileRooms();
 }

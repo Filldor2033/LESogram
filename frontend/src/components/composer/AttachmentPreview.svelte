@@ -113,7 +113,22 @@
         </div>
 
         <div class="upload-preview-actions">
-            {#if !composerState.uploading}
+            {#if composerState.uploading}
+                <button
+                    type="button"
+                    class="secondary small-btn upload-cancel-btn"
+                    onclick={() =>
+                        composerState
+                            .cancelUpload()}
+                >
+                    <Icon
+                        name="close"
+                        size={14}
+                    />
+
+                    {t('cancel')}
+                </button>
+            {:else}
                 <button
                     type="button"
                     class="secondary small-btn"

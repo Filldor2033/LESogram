@@ -1,8 +1,4 @@
 <script lang="ts">
-    import {
-        onDestroy
-    } from 'svelte';
-
     import type {
         Message
     } from '$lib/types/message';
@@ -27,9 +23,6 @@
         t
     } from '$lib/i18n/i18n.svelte';
 
-    import Icon
-        from '$components/common/Icon.svelte';
-
     import MessageText
         from './MessageText.svelte';
 
@@ -51,13 +44,16 @@
         message: Message;
     } = $props();
 
-    let longPressTimer:
-        number | null = null;
-
-    let longPressMoved = false;
-
-    let suppressClick =
-        $state(false);
+    /*
+     * Touch devices (no hover + coarse pointer, e.g.
+     * phones/tablets) open the context menu with a plain
+     * tap; desktop keeps right-click.
+     */
+    const isTouchDevice =
+        typeof window !== 'undefined' &&
+        window.matchMedia(
+            '(hover: none) and (pointer: coarse)'
+        ).matches;
 
     let mine = $derived(
         message.username ===
@@ -88,29 +84,57 @@
         );
     }
 
-    function cancelLongPress() {
-        if (longPressTimer != null) {
-            clearTimeout(
-                longPressTimer
-            );
-
-            longPressTimer = null;
+    function handleClick(
+        event: MouseEvent
+    ) {
+        if (!isTouchDevice) {
+            return;
         }
-    }
 
-    onDestroy(() => {
-        cancelLongPress();
-    });
+        /*
+         * Taps on links, buttons and media inside the
+         * message keep their native behaviour.
+         */
+        const target = event.target as HTMLElement;
+
+        if (
+            target.closest(
+                'a, button, video, input, textarea'
+            )
+        ) {
+            return;
+        }
+
+        if (contextMenuState.open) {
+            return;
+        }
+
+        /*
+         * Stop the very same click from bubbling to the
+         * window-level listener that closes the menu.
+         */
+        event.stopPropagation();
+
+        openContext(
+            event.clientX,
+            event.clientY,
+            true
+        );
+    }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
     class="msg"
     class:me={mine}
     class:other={!mine}
-    class:suppress-click={suppressClick}
     data-message-id={message.id}
     oncontextmenu={(event) => {
+        if (isTouchDevice) {
+            return;
+        }
+
         event.preventDefault();
 
         openContext(
@@ -118,55 +142,7 @@
             event.clientY
         );
     }}
-    ontouchstart={(event) => {
-        if (event.touches.length !== 1) {
-            cancelLongPress();
-            return;
-        }
-
-        const touch =
-            event.touches[0];
-
-        longPressMoved = false;
-        cancelLongPress();
-
-        longPressTimer =
-            window.setTimeout(
-                () => {
-                    if (longPressMoved) {
-                        return;
-                    }
-
-                    suppressClick = true;
-
-                    openContext(
-                        touch.clientX,
-                        touch.clientY,
-                        true
-                    );
-                },
-                450
-            );
-    }}
-    ontouchmove={() => {
-        longPressMoved = true;
-        cancelLongPress();
-    }}
-    ontouchend={(event) => {
-        cancelLongPress();
-
-        /*
-         * A long-press that opened the menu
-         * also fires a synthetic click —
-         * swallow it so the menu does not
-         * close immediately on mobile.
-         */
-        if (suppressClick) {
-            event.preventDefault();
-            suppressClick = false;
-        }
-    }}
-    ontouchcancel={cancelLongPress}
+    onclick={handleClick}
 >
     {#if message.reply_to_id}
         <MessageReply
