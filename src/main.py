@@ -49,6 +49,22 @@ if WEB_DIR.is_dir():
             return FileResponse(path, media_type="image/svg+xml")
         return HTMLResponse("not found", status_code=404)
 
+
+    @app.get("/favicon-{size}.png", include_in_schema=False)
+    async def favicon_png(size: int):
+        path = WEB_DIR / f"favicon-{size}.png"
+        if path.is_file():
+            return FileResponse(path, media_type="image/png")
+        return HTMLResponse("not found", status_code=404)
+
+
+    @app.get("/apple-touch-icon.png", include_in_schema=False)
+    async def apple_touch_icon():
+        path = WEB_DIR / "apple-touch-icon.png"
+        if path.is_file():
+            return FileResponse(path, media_type="image/png")
+        return HTMLResponse("not found", status_code=404)
+
     @app.get("/icons.svg", include_in_schema=False)
     async def icons():
         path = WEB_DIR / "icons.svg"
