@@ -65,6 +65,14 @@ if WEB_DIR.is_dir():
             return FileResponse(path, media_type="image/png")
         return HTMLResponse("not found", status_code=404)
 
+
+    @app.get("/og-image.png", include_in_schema=False)
+    async def og_image():
+        path = WEB_DIR / "og-image.png"
+        if path.is_file():
+            return FileResponse(path, media_type="image/png")
+        return HTMLResponse("not found", status_code=404)
+
     @app.get("/icons.svg", include_in_schema=False)
     async def icons():
         path = WEB_DIR / "icons.svg"
