@@ -1465,6 +1465,27 @@ button:disabled {
     border: 1px solid rgba(148, 163, 184, 0.08);
 }
 
+/* Vertical videos: cap the player height so controls never overflow */
+.msg-media:has(.vp) {
+    width: 100%;
+    max-width: 340px;
+    min-width: min(280px, 100%);
+}
+
+/* Video fills the fixed-width box; letterboxed by object-fit */
+.msg-media .vp video {
+    min-height: 160px;
+}
+
+/*
+ * A message carrying a video keeps a stable bubble width so the
+ * player controls always fit (portrait videos no longer shrink
+ * the bubble to ~180px and clip the buttons).
+ */
+.msg:has(.vp) {
+    min-width: min(300px, 100%);
+}
+
 .msg-media img,
 .msg-media video {
     display: block;
@@ -2053,6 +2074,32 @@ body {
     background: #000;
     overflow: hidden;
     user-select: none;
+    container-type: inline-size;
+    container-name: vp;
+}
+
+/* Narrow players (portrait videos in chat): compact controls */
+@container vp (max-width: 320px) {
+    .vp-time {
+        display: none;
+    }
+
+    .vp-vol {
+        display: none;
+    }
+
+    .vp-controls {
+        padding: 16px 6px 5px;
+    }
+
+    .vp-row {
+        gap: 0;
+    }
+
+    .vp-btn {
+        min-width: 28px;
+        height: 28px;
+    }
 }
 
 .vp video {
@@ -2062,6 +2109,27 @@ body {
     object-fit: contain;
     background: #000;
     cursor: pointer;
+}
+
+/* Fullscreen: the player fills the screen, not just its chat bubble size */
+.vp:fullscreen,
+.vp:fullscreen video {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+}
+
+.vp:fullscreen {
+    background: #000;
+    outline: none;
+}
+
+/* Compact rows were handled by the container query above */
+
+/* If controls would still overflow, allow them to shrink and wrap safely */
+.vp-controls {
+    flex-wrap: wrap;
 }
 
 .vp-bigplay {
@@ -2181,17 +2249,31 @@ body {
     pointer-events: none;
 }
 
+/* Controls row: compact enough to fit a 240px-wide player */
 .vp-row {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-top: 4px;
+    min-width: 0;
+}
+
+.vp-time {
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vp-volume {
+    flex-shrink: 1;
 }
 
 .vp-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: fit-content;
     min-width: 30px;
     height: 30px;
     padding: 0 6px;
@@ -2200,6 +2282,7 @@ body {
     background: transparent;
     color: var(--text);
     cursor: pointer;
+    flex-shrink: 0;
     transition: background 0.15s ease, color 0.15s ease;
 }
 
@@ -2388,6 +2471,21 @@ body {
     color: var(--text);
     cursor: pointer;
     transition: background 0.15s ease, transform 0.15s ease;
+    /* compensate chevron's optical asymmetry (glyph is right-heavy) */
+    padding: 0;
+}
+
+.lb-nav .icon {
+    /* nudge glyphs to optical center of the circle */
+    transform: translateX(0.5px);
+}
+
+.lb-prev .icon {
+    transform: translateX(-1px);
+}
+
+.lb-next .icon {
+    transform: translateX(1px);
 }
 
 .lb-nav:hover {

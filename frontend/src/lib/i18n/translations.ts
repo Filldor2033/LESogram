@@ -82,6 +82,7 @@ const en = {
     delete: "Delete",
     download: "Download",
 
+    videoPlayer: "Video player",
     play: "Play",
     pause: "Pause",
     seek: "Seek",
@@ -284,6 +285,7 @@ const ru = {
     delete: "Удалить",
     download: "Скачать",
 
+    videoPlayer: "Видеоплеер",
     play: "Воспроизвести",
     pause: "Пауза",
     seek: "Перемотка",

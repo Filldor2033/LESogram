@@ -19,6 +19,7 @@
     let volume = $state(1);
     let muted = $state(false);
     let rate = $state(1);
+    let isFs = $state(false);
     let showControls = $state(true);
     let buffered = $state(0);
     let hoverTime = $state<number | null>(null);
@@ -49,6 +50,7 @@
         } else {
             video.pause();
         }
+        root?.focus();
     }
 
     function onPlay() {
@@ -118,10 +120,17 @@
         video.muted = muted;
     }
 
+    function bumpVolume(delta: number) {
+        const v = Math.min(1, Math.max(0, (muted ? 0 : volume) + delta));
+        setVolume(v);
+        wake();
+    }
+
     function cycleRate() {
         const i = RATES.indexOf(rate);
         rate = RATES[(i + 1) % RATES.length];
         if (video) video.playbackRate = rate;
+        wake();
     }
 
     function skip(delta: number) {
@@ -131,12 +140,90 @@
 
     function fullscreen() {
         if (!root) return;
-        if (document.fullscreenElement) {
+        if (document.fullscreenElement || (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement) {
             void document.exitFullscreen();
         } else {
             void root.requestFullscreen();
         }
+        wake();
     }
+
+    function onKeyDown(e: KeyboardEvent): void {
+        const target = e.target as HTMLElement | null;
+        if (
+            target &&
+            (target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable)
+        ) {
+            return;
+        }
+
+        let handled = true;
+
+        switch (e.key.toLowerCase()) {
+            case ' ':
+            case 'k':
+                toggle();
+                break;
+            case 'arrowleft':
+                skip(-5);
+                break;
+            case 'arrowright':
+                skip(5);
+                break;
+            case 'j':
+                skip(-10);
+                break;
+            case 'l':
+                skip(10);
+                break;
+            case 'arrowup':
+                bumpVolume(0.05);
+                break;
+            case 'arrowdown':
+                bumpVolume(-0.05);
+                break;
+            case 'm':
+                toggleMute();
+                break;
+            case 'f':
+                fullscreen();
+                break;
+            default: {
+                const n = Number(e.key);
+                if (!Number.isNaN(n) && duration && video) {
+                    video.currentTime = (n / 10) * duration;
+                } else {
+                    handled = false;
+                }
+            }
+        }
+
+        if (handled) e.preventDefault();
+    }
+
+    // Track fullscreen state (for the expand/collapse icon)
+    $effect(() => {
+        const onFs = () => {
+            isFs = document.fullscreenElement === root;
+            wake();
+        };
+        document.addEventListener('fullscreenchange', onFs);
+        return () => document.removeEventListener('fullscreenchange', onFs);
+    });
+
+    // Window-level hotkeys while fullscreen (focus may be on <body>)
+    $effect(() => {
+        if (!isFs) return;
+        const onKey = (e: KeyboardEvent) => {
+            // Root's own handler already processed events from inside the player
+            if (e.target instanceof Node && root?.contains(e.target)) return;
+            onKeyDown(e);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    });
 
     $effect(() => {
         return () => {
@@ -145,11 +232,17 @@
     });
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
     class="vp"
     bind:this={root}
+    tabindex="0"
+    role="region"
+    aria-label={file_name || t('videoPlayer')}
+    onkeydown={onKeyDown}
     onmousemove={wake}
     onmouseleave={() => {
         if (playing && !scrubbing) showControls = false;
@@ -162,6 +255,7 @@
         preload="metadata"
         playsinline
         onclick={toggle}
+        ondblclick={fullscreen}
         onplay={onPlay}
         onpause={onPause}
         ontimeupdate={onTime}
@@ -169,7 +263,7 @@
         onprogress={onProgress}
     ></video>
 
-    {#if !playing && current === 0}
+    {#if !playing && duration > 0}
         <button
             class="vp-bigplay"
             type="button"
@@ -222,6 +316,7 @@
                 class="vp-btn"
                 type="button"
                 aria-label={playing ? t('pause') : t('play')}
+                title="{playing ? t('pause') : t('play')} (K)"
                 onclick={toggle}
             >
                 <Icon name={playing ? 'pause' : 'play'} size={17} />
@@ -231,6 +326,7 @@
                 class="vp-btn vp-skip"
                 type="button"
                 aria-label="-10s"
+                title="-10s (J)"
                 onclick={() => skip(-10)}
             >
                 <span class="vp-skip-num">10</span>
@@ -241,6 +337,7 @@
                 class="vp-btn vp-skip"
                 type="button"
                 aria-label="+10s"
+                title="+10s (L)"
                 onclick={() => skip(10)}
             >
                 <Icon name="skip-forward" size={15} />
@@ -258,6 +355,7 @@
                     class="vp-btn"
                     type="button"
                     aria-label={t('volume')}
+                    title="{t('volume')} (M)"
                     onclick={toggleMute}
                 >
                     <Icon name={muted || volume === 0 ? 'volume-off' : 'volume'} size={17} />
@@ -278,6 +376,7 @@
                 class="vp-btn vp-rate"
                 type="button"
                 aria-label={t('speed')}
+                title={t('speed')}
                 onclick={cycleRate}
             >
                 {rate}×
@@ -287,9 +386,10 @@
                 class="vp-btn"
                 type="button"
                 aria-label={t('fullscreen')}
+                title="{t('fullscreen')} (F)"
                 onclick={fullscreen}
             >
-                <Icon name="expand" size={16} />
+                <Icon name={isFs ? 'collapse' : 'expand'} size={16} />
             </button>
         </div>
     </div>
