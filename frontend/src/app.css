@@ -1397,6 +1397,14 @@ button:disabled {
     gap: 8px;
     box-shadow: 0 12px 28px rgba(2, 6, 23, 0.18);
 
+    /*
+     * Bubble hugs its content: without this a media-only
+     * message stretches to max-width and leaves a big empty
+     * gap beside the photo.
+     */
+    align-items: flex-start;
+    width: fit-content;
+
     animation: msgIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1.05);
 
     transition:
@@ -1458,7 +1466,15 @@ button:disabled {
 }
 
 .msg-media {
-    width: min(340px, 100%);
+    /*
+     * Fixed 340px (not min(340px,100%)): percentage widths
+     * inside a fit-content bubble resolve cyclically and
+     * blow the bubble up to its max-width, leaving a big
+     * empty gap beside the photo. Explicit px + max-width
+     * keeps the bubble hugging the image.
+     */
+    width: 340px;
+    max-width: 100%;
     border-radius: 14px;
     overflow: hidden;
     background: rgba(2, 6, 23, 0.22);
