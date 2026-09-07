@@ -34,6 +34,17 @@ export class VoiceRecorder {
         );
     }
 
+    /**
+     * True when the page itself cannot access media devices at all
+     * (plain HTTP on a non-localhost origin).
+     */
+    static get insecureContext(): boolean {
+        return (
+            typeof window !== 'undefined' &&
+            !window.isSecureContext
+        );
+    }
+
     static pickMimeType(): string {
         const candidates = [
             'audio/webm;codecs=opus',

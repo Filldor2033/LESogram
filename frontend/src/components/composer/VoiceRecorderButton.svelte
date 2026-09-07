@@ -61,7 +61,12 @@
         if (recording || disabled) return;
 
         if (!VoiceRecorder.supported) {
-            onError('voiceNotSupported');
+            // Plain HTTP (not localhost): media devices don't exist at all
+            onError(
+                VoiceRecorder.insecureContext
+                    ? 'voiceInsecure'
+                    : 'voiceNotSupported'
+            );
             return;
         }
 
