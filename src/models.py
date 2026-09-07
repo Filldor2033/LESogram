@@ -73,6 +73,10 @@ class Message(Base):
         nullable=True,
     )
 
+    voice_duration: Mapped[float | None] = mapped_column(
+        nullable=True,
+    )
+
     __table_args__ = (Index("ix_messages_room_id", "room", "id"),)
 
 

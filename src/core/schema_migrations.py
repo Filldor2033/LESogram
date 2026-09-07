@@ -162,3 +162,11 @@ async def ensure_message_schema():
             "edited_at",
             f"edited_at {edited_at_type}",
         )
+
+        await add_column_if_missing(
+            conn,
+            "messages",
+            columns,
+            "voice_duration",
+            "voice_duration FLOAT",
+        )

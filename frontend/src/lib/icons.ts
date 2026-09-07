@@ -37,7 +37,9 @@ export type IconName =
     | 'zoom-out'
     | 'skip-back'
     | 'skip-forward'
-    | 'crown';
+    | 'crown'
+    | 'mic'
+    | 'stop';
 
 interface IconProps {
     name: IconName;
@@ -122,7 +124,11 @@ const PATHS: Record<IconName, string> = {
     'skip-forward':
         'M5 4l10 8-10 8V4zM19 5v14',
     'crown':
-        'M3 8l4 4 5-6 5 6 4-4v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8zM5 21h14'
+        'M3 8l4 4 5-6 5 6 4-4v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8zM5 21h14',
+    'mic':
+        'M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3zM19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8',
+    'stop':
+        'M6 6h12v12H6z'
 };
 
 export function iconPath(name: IconName): string {

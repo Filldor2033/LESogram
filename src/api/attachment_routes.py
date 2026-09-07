@@ -50,7 +50,9 @@ async def get_attachment(
         raise HTTPException(status_code=404, detail="Attachment not found")
 
     disposition = (
-        "inline" if message.content_type in {"image", "video"} else "attachment"
+        "inline"
+        if message.content_type in {"image", "video", "voice"}
+        else "attachment"
     )
 
     response = FileResponse(
@@ -73,6 +75,7 @@ async def upload_attachment(
     room_token: str = Form(...),
     text: str = Form(default=""),
     reply_to_id: int | None = Form(default=None),
+    voice_duration: float | None = Form(default=None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
@@ -186,6 +189,11 @@ async def upload_attachment(
         mime_type=mime_type,
         file_size=total_size,
         reply_to_id=reply_to_id,
+        voice_duration=(
+            round(voice_duration, 1)
+            if content_type == "voice" and voice_duration is not None
+            else None
+        ),
     )
 
     payload = serialize_message(message)

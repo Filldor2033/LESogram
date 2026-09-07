@@ -12,6 +12,10 @@
     } from '$lib/state/chat.svelte';
 
     import {
+        authState
+    } from '$lib/state/auth.svelte';
+
+    import {
         resolveAttachmentUrl
     } from '$lib/utils/attachments';
 
@@ -35,6 +39,9 @@
 
     import Lightbox
         from '$components/chat/Lightbox.svelte';
+
+    import VoiceMessage
+        from '$components/chat/VoiceMessage.svelte';
 
     let {
         message
@@ -105,6 +112,16 @@
                 />
             {/key}
         {/if}
+
+    {:else if type === 'voice'}
+        <VoiceMessage
+            src={url}
+            durationSec={
+                message.voice_duration ??
+                null
+            }
+            own={message.username === authState.username}
+        />
 
     {:else if type === 'video'}
         <div class="msg-media">

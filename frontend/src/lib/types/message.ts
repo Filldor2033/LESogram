@@ -3,7 +3,8 @@ export type MessageContentType =
     | 'image'
     | 'gif'
     | 'video'
-    | 'file';
+    | 'file'
+    | 'voice';
 
 export type SystemEvent =
     | 'joined'
@@ -39,6 +40,7 @@ export interface Message {
     file_name?: string;
     file_size?: number;
     mime_type?: string;
+    voice_duration?: number;
 
     system_event?: SystemEvent;
     system_actor?: string;

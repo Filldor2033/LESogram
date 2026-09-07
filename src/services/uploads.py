@@ -235,6 +235,20 @@ def validate_upload_file_type(
     if detected_mime in DANGEROUS_MIME_TYPES:
         raise HTTPException(status_code=400, detail="File type is not allowed")
 
+    # Browser voice recordings first: MediaRecorder produces
+    # Matroska/EBML (webm) or OGG containers that would otherwise
+    # be classified as video or generic ogg files.
+    if (
+        filename.startswith("voice_")
+        and ext in {".webm", ".ogg"}
+        and (
+            detected_mime in {"video/x-matroska", "application/ogg"}
+            or detected_mime in ALLOWED_AUDIO_MIME_TYPES
+        )
+    ):
+        mime = "audio/webm" if ext == ".webm" else "audio/ogg"
+        return mime, "voice"
+
     if detected_mime in ALLOWED_IMAGE_MIME_TYPES:
         return detected_mime, "image"
 
@@ -242,6 +256,10 @@ def validate_upload_file_type(
         return detected_mime, "video"
 
     if detected_mime in ALLOWED_AUDIO_MIME_TYPES:
+        # Browser voice recordings (MediaRecorder) are voice
+        # messages, uploaded audio files stay regular files.
+        if ext in {".webm", ".ogg"} and filename.startswith("voice_"):
+            return detected_mime, "voice"
         return detected_mime, "file"
 
     guessed_mime = OFFICE_MIME_BY_EXTENSION.get(ext)

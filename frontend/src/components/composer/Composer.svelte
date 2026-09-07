@@ -24,6 +24,9 @@
         sendAttachment
     } from '$lib/api/attachments';
 
+    import VoiceRecorderButton
+        from './VoiceRecorderButton.svelte';
+
     import {
         sendRealtime
     } from '$lib/realtime/websocket';
@@ -310,6 +313,87 @@
         }
     }
 
+    async function sendVoice(
+        blob: Blob,
+        durationSec: number
+    ) {
+        if (!chatState.active) return;
+
+        const ext = blob.type.includes('ogg')
+            ? 'ogg'
+            : 'webm';
+
+        const file = new File(
+            [blob],
+            `voice_${Date.now()}.${ext}`,
+            { type: blob.type }
+        );
+
+        const form = new FormData();
+
+        form.append(
+            'room_token',
+            chatState.roomToken
+        );
+
+        form.append('text', '');
+
+        form.append(
+            'voice_duration',
+            String(Math.round(durationSec * 10) / 10)
+        );
+
+        form.append('file', file);
+
+        if (composerState.replyTarget?.id) {
+            form.append(
+                'reply_to_id',
+                String(composerState.replyTarget.id)
+            );
+        }
+
+        composerState.uploading = true;
+        composerState.uploadProgress = 0;
+        composerState.setStatus('sendingVoice');
+
+        try {
+            const message = await sendAttachment(
+                authState.token,
+                chatState.room,
+                form
+            );
+
+            chatState.append(message);
+            composerState.clearReply();
+            composerState.setStatus('voiceSent');
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                error.name === 'AbortError'
+            ) {
+                composerState.setStatus('uploadCancelled');
+            } else {
+                composerState.setStatus(
+                    'voiceSendFailed',
+                    {},
+                    true
+                );
+                throw error;
+            }
+        } finally {
+            composerState.uploading = false;
+            composerState.uploadProgress = 0;
+        }
+    }
+
+    function onVoiceError(key: string) {
+        composerState.setStatus(
+            key as never,
+            {},
+            true
+        );
+    }
+
     async function send() {
         if (!chatState.active) {
             composerState.setStatus(
@@ -528,6 +612,13 @@
                 size={17}
             />
         </button>
+
+        <VoiceRecorderButton
+            disabled={!chatState.active}
+            onSend={(blob, dur) =>
+                void sendVoice(blob, dur)}
+            onError={onVoiceError}
+        />
 
         <input
             id="message-input"

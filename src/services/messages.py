@@ -40,6 +40,7 @@ def serialize_message(message: Message) -> dict:
         "reply_to_id": message.reply_to_id,
         "edited_at": message.edited_at.isoformat() if message.edited_at else None,
         "is_edited": message.edited_at is not None,
+        "voice_duration": getattr(message, "voice_duration", None),
     }
 
 
@@ -55,6 +56,7 @@ async def save_message(
     mime_type: str | None = None,
     file_size: int | None = None,
     reply_to_id: int | None = None,
+    voice_duration: float | None = None,
 ) -> Message:
     message = Message(
         username=username,
@@ -66,6 +68,7 @@ async def save_message(
         mime_type=mime_type,
         file_size=file_size,
         reply_to_id=reply_to_id,
+        voice_duration=voice_duration,
     )
 
     db.add(message)
