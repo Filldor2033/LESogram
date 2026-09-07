@@ -855,20 +855,50 @@ select {
     min-width: 0;
 }
 
+/*
+ * Admin badges: premium gold treatment — gradient chip with a
+ * light sheen line and a soft glow, shared by the sidebar
+ * identity row and the users popup.
+ */
 .admin-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 9px;
+    gap: 5px;
+    padding: 5px 10px 5px 8px;
     border-radius: 999px;
-    background: rgba(234, 179, 8, 0.14);
-    border: 1px solid rgba(234, 179, 8, 0.22);
+
+    background:
+        linear-gradient(
+            160deg,
+            rgba(253, 230, 138, 0.22),
+            rgba(234, 179, 8, 0.10) 55%,
+            rgba(180, 83, 9, 0.14)
+        );
+    border: 1px solid rgba(253, 224, 71, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(254, 249, 195, 0.25),
+        0 4px 14px rgba(234, 179, 8, 0.18);
+
     color: #fde68a;
     font-size: 11px;
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     white-space: nowrap;
+
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.admin-badge .icon {
+    color: #fbbf24;
+    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.55));
+}
+
+.admin-badge:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgba(254, 249, 195, 0.3),
+        0 6px 18px rgba(234, 179, 8, 0.30);
 }
 
 .user-badges {
@@ -880,15 +910,35 @@ select {
 }
 
 .user-admin-badge {
-    padding: 5px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 9px 4px 7px;
     border-radius: 999px;
-    background: rgba(234, 179, 8, 0.14);
-    border: 1px solid rgba(234, 179, 8, 0.22);
+
+    background:
+        linear-gradient(
+            160deg,
+            rgba(253, 230, 138, 0.22),
+            rgba(234, 179, 8, 0.10) 55%,
+            rgba(180, 83, 9, 0.14)
+        );
+    border: 1px solid rgba(253, 224, 71, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(254, 249, 195, 0.25),
+        0 4px 14px rgba(234, 179, 8, 0.18);
+
     color: #fde68a;
     font-size: 11px;
     font-weight: bold;
     text-transform: uppercase;
+    letter-spacing: 0.06em;
     white-space: nowrap;
+}
+
+.user-admin-badge .icon {
+    color: #fbbf24;
+    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.55));
 }
 
 .msg-delete-btn {

@@ -76,6 +76,7 @@
 
             {#if authState.isAdmin}
                 <span class="admin-badge">
+                    <Icon name="crown" size={12} />
                     {t('adminBadge')}
                 </span>
             {/if}

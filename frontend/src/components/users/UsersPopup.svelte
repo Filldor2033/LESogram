@@ -15,6 +15,9 @@
     import {
         getApiErrorMessage
     } from '$lib/i18n/api-errors';
+
+    import Icon
+        from '$components/common/Icon.svelte';
 </script>
 
 {#if roomUsersState.open}
@@ -88,7 +91,8 @@
                                     <div
                                         class="user-admin-badge"
                                     >
-                                        👑 {t('adminBadge')}
+                                        <Icon name="crown" size={11} />
+                                        {t('adminBadge')}
                                     </div>
                                 {/if}
 
