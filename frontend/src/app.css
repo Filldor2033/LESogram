@@ -2141,7 +2141,9 @@ body {
     border-radius: 999px;
     display: grid;
     place-items: center;
-    padding: 0 0 0 5px;
+    padding: 0;
+    /* nudge the right-pointing triangle to its optical center */
+    transform: translateX(1px);
 
     background: rgba(34, 197, 94, 0.92);
     color: #04120a;
@@ -2153,12 +2155,12 @@ body {
 }
 
 .vp-bigplay:hover {
-    transform: scale(1.08);
+    transform: translateX(1px) scale(1.08);
     background: var(--accent);
 }
 
 .vp-bigplay:active {
-    transform: scale(0.96);
+    transform: translateX(1px) scale(0.96);
 }
 
 .vp-controls {
