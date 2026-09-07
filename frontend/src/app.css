@@ -131,6 +131,53 @@ select {
     cursor: pointer;
 }
 
+/*
+ * Flash highlight for the message a reply points to
+ * (triggered by clicking the reply quote). Stacks on top
+ * of the entry animation (msgIn) instead of replacing it.
+ * .msg.msg-flash doubles specificity so the later .msg
+ * rule cannot override this animation.
+ */
+.msg.msg-flash {
+    animation:
+        msgIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1.05),
+        msgFlash 1.6s ease;
+}
+
+@keyframes msgFlash {
+    0%, 100% {
+        box-shadow: 0 12px 28px rgba(2, 6, 23, 0.18);
+    }
+
+    15% {
+        box-shadow:
+            0 0 0 2px var(--accent),
+            0 0 24px rgba(34, 197, 94, 0.45),
+            0 12px 28px rgba(2, 6, 23, 0.18);
+    }
+
+    35% {
+        box-shadow:
+            0 0 0 2px rgba(34, 197, 94, 0.35),
+            0 0 12px rgba(34, 197, 94, 0.18),
+            0 12px 28px rgba(2, 6, 23, 0.18);
+    }
+
+    55% {
+        box-shadow:
+            0 0 0 2px var(--accent),
+            0 0 24px rgba(34, 197, 94, 0.45),
+            0 12px 28px rgba(2, 6, 23, 0.18);
+    }
+
+    75% {
+        box-shadow:
+            0 0 0 2px rgba(34, 197, 94, 0.25),
+            0 0 12px rgba(34, 197, 94, 0.10),
+            0 12px 28px rgba(2, 6, 23, 0.18);
+    }
+}
+
 .msg-reply-author {
     font-weight: bold;
     color: var(--accent);

@@ -24,14 +24,31 @@
     );
 
     function scrollToReply() {
-        document
-            .querySelector<HTMLElement>(
-                `.msg[data-message-id="${replyToId}"]`
-            )
-            ?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
+        const target = document.querySelector<HTMLElement>(
+            `.msg[data-message-id="${replyToId}"]`
+        );
+
+        target?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
+        /*
+         * Flash the replied-to message: re-trigger the CSS
+         * animation (restart it if a previous one is still
+         * running). The class is removed on animationend.
+         */
+        if (target) {
+            target.classList.remove('msg-flash');
+            void target.offsetWidth; // force reflow to restart animation
+            target.classList.add('msg-flash');
+
+            const cleanup = () => {
+                target.classList.remove('msg-flash');
+                target.removeEventListener('animationend', cleanup);
+            };
+            target.addEventListener('animationend', cleanup);
+        }
     }
 </script>
 
