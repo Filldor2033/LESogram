@@ -1736,6 +1736,16 @@ button:disabled {
     padding: 9px 0;
 }
 
+/* Mic button: same geometry as the attach button, icon perfectly centered */
+.input-row .voice-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-width: 44px;
+    padding: 9px 0;
+}
+
 .composer-status {
     margin-top: 10px;
 }

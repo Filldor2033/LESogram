@@ -65,13 +65,32 @@
             return;
         }
 
+        // If the site was denied before, Chrome fails silently
+        // (no prompt) — give an actionable hint instead.
+        try {
+            const perm = await navigator.permissions.query({
+                name: 'microphone' as PermissionName
+            });
+
+            if (perm.state === 'denied') {
+                onError('voiceMicBlocked');
+                return;
+            }
+        } catch {
+            // permissions API not available — proceed, gUM will show the prompt
+        }
+
         try {
             await recorder.start();
             recording = true;
             elapsed = 0;
             levels = [];
-        } catch {
-            onError('voiceMicDenied');
+        } catch (err) {
+            if (err instanceof DOMException && err.name === 'NotAllowedError') {
+                onError('voiceMicBlocked');
+            } else {
+                onError('voiceMicDenied');
+            }
         }
     }
 
@@ -148,7 +167,6 @@
 {:else}
     <button
         class="secondary tool-btn voice-btn"
-        style="max-width:40px"
         type="button"
         disabled={disabled}
         title={t('voiceRecord')}
