@@ -8,6 +8,10 @@
     } from '$lib/state/rooms.svelte';
 
     import {
+        chatState
+    } from '$lib/state/chat.svelte';
+
+    import {
         resolveAttachmentUrl
     } from '$lib/utils/attachments';
 
@@ -26,11 +30,19 @@
     import Icon
         from '$components/common/Icon.svelte';
 
+    import VideoPlayer
+        from '$components/chat/VideoPlayer.svelte';
+
+    import Lightbox
+        from '$components/chat/Lightbox.svelte';
+
     let {
         message
     }: {
         message: Message;
     } = $props();
+
+    let lightboxOpen = $state(false);
 
     let type = $derived(
         message.content_type ?? 'text'
@@ -42,11 +54,37 @@
             roomsState.roomToken
         )
     );
+
+    // All images in the current chat, for lightbox navigation
+    let galleryImages = $derived(
+        chatState.messages
+            .filter(
+                (m) =>
+                    (m.content_type === 'image' ||
+                        m.content_type === 'gif') &&
+                    m.media_url
+            )
+            .map((m) => ({
+                url: resolveAttachmentUrl(
+                    m.media_url,
+                    roomsState.roomToken
+                ),
+                name: m.file_name
+            }))
+    );
+
+    let galleryIndex = $derived(
+        galleryImages.findIndex(
+            (g) => g.url === url
+        )
+    );
 </script>
 
 {#if url && type !== 'text'}
     {#if type === 'image' || type === 'gif'}
         <div class="msg-media">
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
             <img
                 src={url}
                 alt={
@@ -54,18 +92,26 @@
                     t('attachmentLabel')
                 }
                 loading="lazy"
+                onclick={() => (lightboxOpen = true)}
             />
         </div>
 
+        {#if lightboxOpen}
+            {#key url}
+                <Lightbox
+                    images={galleryImages}
+                    index={Math.max(0, galleryIndex)}
+                    onclose={() => (lightboxOpen = false)}
+                />
+            {/key}
+        {/if}
+
     {:else if type === 'video'}
         <div class="msg-media">
-            <!-- svelte-ignore a11y_media_has_caption -->
-            <video
+            <VideoPlayer
                 src={url}
-                controls
-                preload="metadata"
-            >
-            </video>
+                file_name={message.file_name}
+            />
         </div>
 
     {:else}

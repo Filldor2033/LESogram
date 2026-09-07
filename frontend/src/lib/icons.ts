@@ -28,7 +28,15 @@ export type IconName =
     | 'chevron-right'
     | 'copy'
     | 'expand'
-    | 'collapse';
+    | 'collapse'
+    | 'play'
+    | 'pause'
+    | 'volume'
+    | 'volume-off'
+    | 'zoom-in'
+    | 'zoom-out'
+    | 'skip-back'
+    | 'skip-forward';
 
 interface IconProps {
     name: IconName;
@@ -95,7 +103,23 @@ const PATHS: Record<IconName, string> = {
     'expand':
         'M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3',
     'collapse':
-        'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7'
+        'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7',
+    'play':
+        'M6 4l14 8-14 8V4z',
+    'pause':
+        'M7 4v16M17 4v16',
+    'volume':
+        'M11 5L6 9H3v6h3l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13',
+    'volume-off':
+        'M11 5L6 9H3v6h3l5 4V5zM22 9l-6 6M16 9l6 6',
+    'zoom-in':
+        'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35M11 8v6M8 11h6',
+    'zoom-out':
+        'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35M8 11h6',
+    'skip-back':
+        'M19 20L9 12l10-8v16zM5 19V5',
+    'skip-forward':
+        'M5 4l10 8-10 8V4zM19 5v14'
 };
 
 export function iconPath(name: IconName): string {
