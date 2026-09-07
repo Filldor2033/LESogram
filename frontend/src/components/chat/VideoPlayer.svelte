@@ -148,6 +148,32 @@
         wake();
     }
 
+    async function downloadVideo(): Promise<void> {
+        const name = file_name || 'video.mp4';
+        try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            // fallback: plain navigation download
+            const a = document.createElement('a');
+            a.href = src;
+            a.download = name;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+    }
+
     function onKeyDown(e: KeyboardEvent): void {
         const target = e.target as HTMLElement | null;
         if (
@@ -380,6 +406,16 @@
                 onclick={cycleRate}
             >
                 {rate}×
+            </button>
+
+            <button
+                class="vp-btn"
+                type="button"
+                aria-label={t('download')}
+                title={t('download')}
+                onclick={() => downloadVideo()}
+            >
+                <Icon name="download" size={16} />
             </button>
 
             <button
