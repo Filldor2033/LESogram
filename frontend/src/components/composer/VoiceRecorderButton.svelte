@@ -77,11 +77,19 @@
                 name: 'microphone' as PermissionName
             });
 
+            console.info('[voice] mic permission state:', perm.state);
+
             if (perm.state === 'denied') {
+                console.error(
+                    '[voice] denied at permissions.query — this is either a site-level block,' +
+                    ' the global Chrome setting (chrome://settings/content/microphone),' +
+                    ' or an OS-level privacy block (Windows/macOS).'
+                );
                 onError('voiceMicBlocked');
                 return;
             }
-        } catch {
+        } catch (e) {
+            console.info('[voice] permissions.query unavailable:', e);
             // permissions API not available — proceed, gUM will show the prompt
         }
 
