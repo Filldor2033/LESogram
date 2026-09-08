@@ -321,7 +321,9 @@
 
         const ext = blob.type.includes('ogg')
             ? 'ogg'
-            : 'webm';
+            : blob.type.includes('wav')
+              ? 'wav'
+              : 'webm';
 
         const file = new File(
             [blob],

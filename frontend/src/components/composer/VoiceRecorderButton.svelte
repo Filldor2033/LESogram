@@ -7,7 +7,8 @@
 
     import {
         VoiceRecorder,
-        formatVoiceDuration
+        formatVoiceDuration,
+        trimVoiceToWav
     } from '$lib/utils/voice-recorder';
 
     import {
@@ -30,17 +31,26 @@
     let recorder = new VoiceRecorder();
 
     let recording = $state(false);
+    let paused = $state(false);
     let elapsed = $state(0);
     let levels = $state<number[]>([]);
 
+    // trim state (on pause)
+    let trimFrom = $state(0);
+    let trimTo = $state(0);
+    let dragging: 'from' | 'to' | null = null;
+
+    let sending = $state(false);
+
     const MAX_DURATION = 300; // 5 min
+    const MIN_TRIM = 0.3;
 
     $effect(() => {
         recorder.onTick = (sec) => {
             elapsed = sec;
 
             if (sec >= MAX_DURATION) {
-                void finish();
+                void pauseOrFinish();
             }
         };
 
@@ -61,7 +71,6 @@
         if (recording || disabled) return;
 
         if (!VoiceRecorder.supported) {
-            // Plain HTTP (not localhost): media devices don't exist at all
             onError(
                 VoiceRecorder.insecureContext
                     ? 'voiceInsecure'
@@ -70,8 +79,6 @@
             return;
         }
 
-        // If the site was denied before, Chrome fails silently
-        // (no prompt) — give an actionable hint instead.
         try {
             const perm = await navigator.permissions.query({
                 name: 'microphone' as PermissionName
@@ -90,12 +97,12 @@
             }
         } catch (e) {
             console.info('[voice] permissions.query unavailable:', e);
-            // permissions API not available — proceed, gUM will show the prompt
         }
 
         try {
             await recorder.start();
             recording = true;
+            paused = false;
             elapsed = 0;
             levels = [];
         } catch (err) {
@@ -123,18 +130,85 @@
         }
     }
 
-    async function finish() {
+    /** Pause: freeze the recording and open the trim editor. */
+    function togglePause() {
         if (!recording) return;
 
-        const result = await recorder.stop();
-        recording = false;
+        if (!paused) {
+            recorder.pause();
+            paused = true;
 
-        if (!result) {
-            onError('voiceTooShort');
+            trimFrom = 0;
+            trimTo = elapsed;
+        } else {
+            // resume only if the trim handles are at the ends;
+            // otherwise the user is mid-edit — send button applies the trim
+            recorder.resume();
+            paused = false;
+        }
+    }
+
+    async function pauseOrFinish() {
+        if (paused) {
+            await finish();
+        } else {
+            togglePause();
+        }
+    }
+
+    async function finish() {
+        if (!recording || sending) return;
+
+        // Validate the trim range BEFORE stopping the recorder,
+        // so an invalid selection doesn't destroy the recording.
+        if (paused && trimTo - trimFrom < MIN_TRIM) {
+            onError('voiceTrimTooShort');
             return;
         }
 
-        onSend(result.blob, result.durationSec);
+        sending = true;
+
+        try {
+            const result = await recorder.stop();
+            recording = false;
+            paused = false;
+
+            if (!result) {
+                onError('voiceTooShort');
+                return;
+            }
+
+            // Apply trim if the handles moved
+            const wantsTrim =
+                trimFrom > 0.05 || trimTo < result.durationSec - 0.05;
+
+            if (wantsTrim) {
+                const trimmed = await trimVoiceToWav(
+                    result.blob,
+                    trimFrom,
+                    trimTo
+                );
+
+                if (trimmed) {
+                    onSend(
+                        trimmed,
+                        Math.round((trimTo - trimFrom) * 10) / 10
+                    );
+                } else {
+                    // trim failed to decode — send original
+                    onSend(result.blob, result.durationSec);
+                }
+            } else {
+                onSend(result.blob, result.durationSec);
+            }
+        } catch (err) {
+            console.error('[voice] finish failed:', err);
+            onError('voiceSendFailed');
+        } finally {
+            sending = false;
+            trimFrom = 0;
+            trimTo = 0;
+        }
     }
 
     async function cancel() {
@@ -142,7 +216,54 @@
 
         await recorder.cancel();
         recording = false;
+        paused = false;
     }
+
+    // ---- trim dragging ----
+
+    // The bars element captured at drag start — event.currentTarget
+    // is meaningless inside window-level mousemove handlers.
+    let dragBars: HTMLElement | null = null;
+
+    function startDrag(which: 'from' | 'to', e: MouseEvent) {
+        e.stopPropagation();
+        dragging = which;
+        dragBars = (e.currentTarget as HTMLElement).closest('.voice-rec-bars');
+
+        const move = (ev: MouseEvent) => moveDrag(ev);
+
+        const up = () => {
+            dragging = null;
+            dragBars = null;
+            window.removeEventListener('mousemove', move);
+            window.removeEventListener('mouseup', up);
+        };
+
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+    }
+
+    function moveDrag(e: MouseEvent) {
+        if (!dragBars || !dragging) return;
+
+        const rect = dragBars.getBoundingClientRect();
+        const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+
+        if (dragging === 'from') {
+            trimFrom = Math.max(0, Math.min(frac * elapsed, trimTo - MIN_TRIM));
+        } else if (dragging === 'to') {
+            trimTo = Math.min(elapsed, Math.max(frac * elapsed, trimFrom + MIN_TRIM));
+        }
+    }
+
+    function resetTrim() {
+        trimFrom = 0;
+        trimTo = elapsed;
+    }
+
+    const fromPct = $derived(elapsed > 0 ? (trimFrom / elapsed) * 100 : 0);
+    const toPct = $derived(elapsed > 0 ? (trimTo / elapsed) * 100 : 100);
+    const keepDur = $derived(trimTo - trimFrom);
 
     onDestroy(() => {
         void recorder.cancel();
@@ -152,6 +273,7 @@
 {#if recording}
     <div
         class="voice-rec"
+        class:paused
         in:fly={{ y: 10, duration: 180 }}
     >
         <button
@@ -165,9 +287,19 @@
         </button>
 
         <div class="voice-rec-visual">
-            <span class="voice-rec-dot"></span>
+            <span class="voice-rec-dot" class:hidden={paused}></span>
 
-            <div class="voice-rec-bars">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="voice-rec-bars" class:editable={paused}>
+                <div
+                    class="vbar-mask left"
+                    style="width: {fromPct}%"
+                ></div>
+                <div
+                    class="vbar-mask right"
+                    style="width: {100 - toPct}%"
+                ></div>
+
                 {#each levels as l, i (i)}
                     <div
                         class="vbar"
@@ -176,19 +308,80 @@
                 {:else}
                     <div class="vbar" style="height: 16%"></div>
                 {/each}
+
+                {#if paused}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div
+                        class="trim-handle from"
+                        style="left: calc({fromPct}% - 7px)"
+                        onmousedown={(e) => startDrag('from', e)}
+                        role="slider"
+                        aria-label="trim start"
+                        aria-valuemin={0}
+                        aria-valuemax={Math.round(trimTo - MIN_TRIM)}
+                        aria-valuenow={Math.round(trimFrom)}
+                        tabindex="0"
+                    ></div>
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div
+                        class="trim-handle to"
+                        style="left: calc({toPct}% - 7px)"
+                        onmousedown={(e) => startDrag('to', e)}
+                        role="slider"
+                        aria-label="trim end"
+                        aria-valuemin={Math.round(trimFrom + MIN_TRIM)}
+                        aria-valuemax={Math.round(elapsed)}
+                        aria-valuenow={Math.round(trimTo)}
+                        tabindex="0"
+                    ></div>
+                {/if}
             </div>
 
             <span class="voice-rec-timer">
-                {formatVoiceDuration(elapsed)}
+                {formatVoiceDuration(paused ? keepDur : elapsed)}
             </span>
         </div>
+
+        {#if paused}
+            <button
+                class="voice-rec-btn voice-rec-continue"
+                type="button"
+                title={t('voiceResume')}
+                aria-label={t('voiceResume')}
+                onclick={togglePause}
+            >
+                <Icon name="mic" size={15} />
+            </button>
+
+            <button
+                class="voice-rec-btn voice-rec-reset"
+                type="button"
+                title={t('voiceTrimReset')}
+                aria-label={t('voiceTrimReset')}
+                onclick={resetTrim}
+                disabled={trimFrom === 0 && trimTo === elapsed}
+            >
+                <Icon name="refresh" size={15} />
+            </button>
+        {:else}
+            <button
+                class="voice-rec-btn voice-rec-pause"
+                type="button"
+                title={t('voicePause')}
+                aria-label={t('voicePause')}
+                onclick={togglePause}
+            >
+                <Icon name="pause" size={15} />
+            </button>
+        {/if}
 
         <button
             class="voice-rec-btn voice-rec-send"
             type="button"
             title={t('voiceSendAction')}
             aria-label={t('voiceSendAction')}
-            onclick={finish}
+            onclick={() => void finish()}
+            disabled={sending}
         >
             <Icon name="send" size={15} />
         </button>

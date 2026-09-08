@@ -237,17 +237,21 @@ def validate_upload_file_type(
 
     # Browser voice recordings first: MediaRecorder produces
     # Matroska/EBML (webm) or OGG containers that would otherwise
-    # be classified as video or generic ogg files.
+    # be classified as video or generic ogg files. Trimmed voice
+    # messages are re-encoded client-side to WAV.
     if (
         filename.startswith("voice_")
-        and ext in {".webm", ".ogg"}
+        and ext in {".webm", ".ogg", ".wav"}
         and (
             detected_mime in {"video/x-matroska", "application/ogg"}
             or detected_mime in ALLOWED_AUDIO_MIME_TYPES
         )
     ):
-        mime = "audio/webm" if ext == ".webm" else "audio/ogg"
-        return mime, "voice"
+        if ext == ".webm":
+            return "audio/webm", "voice"
+        if ext == ".wav":
+            return "audio/wav", "voice"
+        return "audio/ogg", "voice"
 
     if detected_mime in ALLOWED_IMAGE_MIME_TYPES:
         return detected_mime, "image"

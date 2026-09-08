@@ -98,6 +98,11 @@ const en = {
     sendingVoice: "Sending voice message…",
     voiceSent: "Voice message sent",
     voiceSendFailed: "Failed to send voice message",
+
+    voicePause: "Pause and edit",
+    voiceResume: "Continue recording",
+    voiceTrimReset: "Reset trim",
+    voiceTrimTooShort: "Trimmed fragment is too short (min 0.3s)",
     play: "Play",
     pause: "Pause",
     seek: "Seek",
@@ -316,6 +321,11 @@ const ru = {
     sendingVoice: "Отправка голосового…",
     voiceSent: "Голосовое отправлено",
     voiceSendFailed: "Не удалось отправить голосовое",
+
+    voicePause: "Пауза и редактирование",
+    voiceResume: "Продолжить запись",
+    voiceTrimReset: "Сбросить обрезку",
+    voiceTrimTooShort: "Обрезанный фрагмент слишком короткий (мин. 0.3с)",
     play: "Воспроизвести",
     pause: "Пауза",
     seek: "Перемотка",
