@@ -178,8 +178,14 @@ export class VoiceRecorder {
 
         // Exclude paused time: the recorded audio contains no
         // paused segments, so the duration must not count them.
-        const durationSec =
-            (performance.now() - this.startedAt - this.pausedTotal) / 1000;
+        // When stopped while paused, the CURRENT pause span has not
+        // been folded into pausedTotal yet (that happens in
+        // resume()) — account for it here.
+        const now = performance.now();
+        const recordedMs = this.paused
+            ? this.pauseStartedAt - this.startedAt - this.pausedTotal
+            : now - this.startedAt - this.pausedTotal;
+        const durationSec = Math.max(0, recordedMs) / 1000;
 
         const blob = await new Promise<Blob>((resolve) => {
             if (!this.recorder) {
@@ -238,6 +244,21 @@ export class VoiceRecorder {
         const waveform = resample(this.amplitude, TARGET_SAMPLES);
 
         return { blob, durationSec, waveform };
+    }
+
+    /**
+     * Returns the audio captured SO FAR without ending the recording
+     * session (the recorder keeps its state; on pause the underlying
+     * MediaRecorder is already paused, so chunks are complete).
+     */
+    async snapshotForPreview(): Promise<Blob | null> {
+        if (!this.recorder) return null;
+
+        const blob = new Blob(this.chunks);
+
+        if (blob.size === 0) return null;
+
+        return blob;
     }
 
     /** Cancels without returning a recording. */

@@ -315,7 +315,8 @@
 
     async function sendVoice(
         blob: Blob,
-        durationSec: number
+        durationSec: number,
+        waveform?: number[]
     ) {
         if (!chatState.active) return;
 
@@ -344,6 +345,15 @@
             'voice_duration',
             String(Math.round(durationSec * 10) / 10)
         );
+
+        if (waveform && waveform.length > 0) {
+            form.append(
+                'voice_waveform',
+                JSON.stringify(
+                    waveform.map((v) => Math.round(v * 100) / 100)
+                )
+            );
+        }
 
         form.append('file', file);
 
@@ -617,8 +627,8 @@
 
         <VoiceRecorderButton
             disabled={!chatState.active}
-            onSend={(blob, dur) =>
-                void sendVoice(blob, dur)}
+            onSend={(blob, dur, wave) =>
+                void sendVoice(blob, dur, wave)}
             onError={onVoiceError}
         />
 

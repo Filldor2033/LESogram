@@ -24,7 +24,8 @@
     }: {
         onSend: (
             blob: Blob,
-            durationSec: number
+            durationSec: number,
+            waveform?: number[]
         ) => void;
         onError: (message: string) => void;
         disabled?: boolean;
@@ -46,6 +47,7 @@
      * one WAV.
      */
     let parts: Blob[] = [];
+    let partWaves: number[][] = [];
     let baseDur = $state(0);
 
     // Trim state for the CURRENT segment (seconds within it).
@@ -58,6 +60,12 @@
     let segWave = $state<number[]>([]);
 
     let sending = $state(false);
+
+    // ---- pause-time preview ----
+    let previewUrl = $state('');
+    let previewAudio: HTMLAudioElement | null = null;
+    let previewing = $state(false);
+    let previewAt = $state(0);
 
     const MAX_DURATION = 300; // 5 min
     const MIN_TRIM = 0.3;
@@ -101,6 +109,7 @@
 
         // Never inherit state from a previous session.
         parts = [];
+        partWaves = [];
         baseDur = 0;
         trimFrom = 0;
         trimTo = 0;
@@ -171,6 +180,9 @@
 
             // The editor shows the whole segment, not the rolling window.
             segWave = resampleWave(recorder.amplitude, WAVE_BARS);
+
+            // A stale preview URL must not leak into the new pause.
+            teardownPreview();
         } else {
             const seg = elapsed - baseDur;
             const wantsTrim = trimFrom > 0.05 || trimTo < seg - 0.05;
@@ -179,6 +191,7 @@
                 // Commit the edit and keep recording after it.
                 void commitTrimAndContinue();
             } else {
+                stopPreview();
                 recorder.resume();
                 paused = false;
             }
@@ -201,6 +214,10 @@
     async function commitTrimAndContinue() {
         if (sending) return;
         sending = true;
+
+        // The current recorder's amplitude track — captured before
+        // the instance is swapped.
+        const recorderPrevWave = recorder.amplitude.slice();
 
         try {
             const seg = elapsed - baseDur;
@@ -225,6 +242,15 @@
 
                     if (trimmed) {
                         parts.push(trimmed);
+
+                        partWaves.push(
+                            sliceWave(
+                                recorderPrevWave,
+                                trimFrom / seg,
+                                trimTo / seg
+                            )
+                        );
+
                         baseDur += trimTo - trimFrom;
                     } else {
                         // Decode failed — keep the segment uncut.
@@ -239,6 +265,8 @@
                     baseDur += part.durationSec;
                 }
             }
+
+            teardownPreview();
 
             const next = new VoiceRecorder();
             await next.start();
@@ -256,6 +284,7 @@
             recording = false;
             paused = false;
             parts = [];
+            partWaves = [];
             baseDur = 0;
             recorder = new VoiceRecorder();
         } finally {
@@ -283,6 +312,8 @@
             return;
         }
 
+        stopPreview();
+
         sending = true;
 
         try {
@@ -298,12 +329,22 @@
             let finalBlob: Blob | null = null;
             let finalDur = 0;
 
+            // Segment trim bounds + wave, used for the final waveform.
+            const recorderPrevWaveFinal = recorder.amplitude.slice();
+            let segDurFinal = result?.durationSec ?? 0;
+            let fromFinal = from;
+            let toActualFinal = to;
+
             if (result) {
                 const segDur = result.durationSec;
                 const toActual =
                     to === Number.POSITIVE_INFINITY
                         ? segDur
                         : Math.min(to, segDur);
+
+                fromFinal = from;
+                toActualFinal = toActual;
+                segDurFinal = segDur;
 
                 finalBlob = result.blob;
                 finalDur = segDur;
@@ -335,6 +376,30 @@
                 }
             }
 
+            // Full waveform: committed parts + the final segment.
+            const fullWave: number[] = [];
+
+            for (const w of partWaves) {
+                for (const v of w) fullWave.push(v);
+            }
+
+            const segWaveFull = recorderPrevWaveFinal;
+
+            if (segWaveFull) {
+                fullWave.push(
+                    ...sliceWave(
+                        segWaveFull,
+                        from / segDurFinal,
+                        toActualFinal / segDurFinal
+                    )
+                );
+            }
+
+            const wave =
+                fullWave.length > 0
+                    ? resampleWave(fullWave, WAVE_BARS)
+                    : undefined;
+
             if (parts.length > 0) {
                 const blobs = finalBlob ? [...parts, finalBlob] : parts;
 
@@ -343,7 +408,8 @@
                 if (merged) {
                     onSend(
                         merged,
-                        Math.round((baseDur + finalDur) * 10) / 10
+                        Math.round((baseDur + finalDur) * 10) / 10,
+                        wave
                     );
                 } else {
                     console.error(
@@ -351,10 +417,10 @@
                     );
 
                     const last = finalBlob ?? parts[parts.length - 1];
-                    onSend(last, Math.round(finalDur * 10) / 10);
+                    onSend(last, Math.round(finalDur * 10) / 10, wave);
                 }
             } else {
-                onSend(finalBlob!, Math.round(finalDur * 10) / 10);
+                onSend(finalBlob!, Math.round(finalDur * 10) / 10, wave);
             }
         } catch (err) {
             console.error('[voice] finish failed:', err);
@@ -368,6 +434,7 @@
     async function cancel() {
         if (!recording || sending) return;
 
+        stopPreview();
         await recorder.cancel();
         recording = false;
         paused = false;
@@ -376,10 +443,12 @@
 
     function resetSession() {
         parts = [];
+        partWaves = [];
         baseDur = 0;
         trimFrom = 0;
         trimTo = 0;
         segWave = [];
+        teardownPreview();
         recorder = new VoiceRecorder();
     }
 
@@ -440,7 +509,97 @@
         trimTo = elapsed - baseDur;
     }
 
+    /** Slices a bar array to a fractional [from, to] range. */
+    function sliceWave(wave: number[], from: number, to: number): number[] {
+        if (wave.length === 0) return [];
+
+        const a = Math.max(0, Math.min(1, from)) * wave.length;
+        const b = Math.max(0, Math.min(1, to)) * wave.length;
+
+        const out: number[] = [];
+
+        for (let x = a; x < b; x += wave.length / WAVE_BARS) {
+            out.push(wave[Math.floor(x)] ?? 0);
+        }
+
+        return out;
+    }
+
+    /**
+     * Plays the kept part of the current segment so the user can
+     * listen to the edit before sending. Playing stops when it
+     * reaches the trim end (or the segment end).
+     */
+    async function togglePreview() {
+        if (previewing) {
+            previewAudio?.pause();
+            return;
+        }
+
+        try {
+            if (!previewUrl) {
+                const seg = await recorder.snapshotForPreview();
+                if (!seg) return;
+                previewUrl = URL.createObjectURL(seg);
+            }
+
+            if (!previewAudio) {
+                previewAudio = new Audio(previewUrl);
+                previewAudio.addEventListener('ended', () => {
+                    previewing = false;
+                    previewAt = 0;
+                });
+                previewAudio.addEventListener('timeupdate', () => {
+                    if (!previewAudio) return;
+                    previewAt = previewAudio.currentTime;
+
+                    // stop at the trim end
+                    if (previewAudio.currentTime >= trimTo) {
+                        previewAudio.pause();
+                        previewing = false;
+                        previewAt = 0;
+                    }
+                });
+            }
+
+            // restart from the trim start each time
+            previewAudio.currentTime = Math.min(trimFrom, (previewAudio.duration || Infinity) - 0.05);
+            await previewAudio.play();
+            previewing = true;
+        } catch (err) {
+            console.error('[voice] preview failed:', err);
+        }
+    }
+
+    function stopPreview() {
+        if (previewAudio) {
+            previewAudio.pause();
+        }
+        previewing = false;
+        previewAt = 0;
+    }
+
+    function teardownPreview() {
+        stopPreview();
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        previewUrl = '';
+        previewAudio = null;
+    }
+
     const segElapsed = $derived(elapsed - baseDur);
+    const previewPct = $derived(
+        previewing || previewAt > 0
+            ? Math.min(
+                  100,
+                  Math.max(
+                      0,
+                      ((trimFrom + previewAt) / Math.max(segElapsed, 0.001)) * 100
+                  )
+              )
+            : 0
+    );
     const fromPct = $derived(segElapsed > 0 ? (trimFrom / segElapsed) * 100 : 0);
     const toPct = $derived(segElapsed > 0 ? (trimTo / segElapsed) * 100 : 100);
     const keepDur = $derived(baseDur + (trimTo - trimFrom));
@@ -480,6 +639,12 @@
                         class="vbar-mask right"
                         style="width: {100 - toPct}%"
                     ></div>
+                    {#if previewPct > 0}
+                        <div
+                            class="vbar-progress"
+                            style="width: {previewPct}%"
+                        ></div>
+                    {/if}
                 {/if}
 
                 {#if paused && segWave.length > 0}
@@ -536,6 +701,16 @@
         </div>
 
         {#if paused}
+            <button
+                class="voice-rec-btn voice-rec-play"
+                type="button"
+                title={previewing ? t('pause') : t('play')}
+                aria-label={previewing ? t('pause') : t('play')}
+                onclick={() => void togglePreview()}
+            >
+                <Icon name={previewing ? 'pause' : 'play'} size={15} />
+            </button>
+
             <button
                 class="voice-rec-btn voice-rec-continue"
                 type="button"

@@ -116,6 +116,7 @@
     {:else if type === 'voice'}
         <VoiceMessage
             src={url}
+            waveform={message.voice_waveform}
             durationSec={
                 message.voice_duration ??
                 null

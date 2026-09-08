@@ -170,3 +170,11 @@ async def ensure_message_schema():
             "voice_duration",
             "voice_duration FLOAT",
         )
+
+        await add_column_if_missing(
+            conn,
+            "messages",
+            columns,
+            "voice_waveform",
+            "voice_waveform TEXT",
+        )

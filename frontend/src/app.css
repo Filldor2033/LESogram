@@ -2793,12 +2793,14 @@ body {
     display: flex;
     align-items: center;
     gap: 2px;
-    height: 30px;
-    min-width: 120px;
+    height: 36px;
+    min-width: 150px;
     cursor: pointer;
     padding: 0 2px;
 }
 
+/* Same bar look as the recorder waveform so sent messages
+   visually match what the user saw while recording. */
 .voice-bar {
     width: 3px;
     min-width: 3px;
@@ -2808,6 +2810,15 @@ body {
 }
 
 .voice-bar.played {
+    background: var(--accent);
+}
+
+/* Real amplitude data present — the bars breathe */
+.voice-wave.real-wave .voice-bar {
+    background: rgba(148, 163, 184, 0.5);
+}
+
+.voice-wave.real-wave .voice-bar.played {
     background: var(--accent);
 }
 
@@ -2844,6 +2855,26 @@ body {
 
 .voice-rec-bars.editable {
     cursor: default;
+}
+
+.voice-rec-btn.voice-rec-play {
+    color: var(--ok, #22c55e);
+}
+
+.voice-rec-bars .vbar-progress {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(34, 197, 94, 0.14) 0.1%,
+        rgba(34, 197, 94, 0.14) 100%
+    );
+    border-right: 1.5px solid rgba(34, 197, 94, 0.55);
+    z-index: 2;
 }
 
 .voice-rec-bars .vbar-mask {

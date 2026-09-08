@@ -41,6 +41,7 @@ export interface Message {
     file_size?: number;
     mime_type?: string;
     voice_duration?: number;
+    voice_waveform?: string | null;
 
     system_event?: SystemEvent;
     system_actor?: string;

@@ -1,3 +1,5 @@
+import json
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +43,38 @@ def serialize_message(message: Message) -> dict:
         "edited_at": message.edited_at.isoformat() if message.edited_at else None,
         "is_edited": message.edited_at is not None,
         "voice_duration": getattr(message, "voice_duration", None),
+        "voice_waveform": getattr(message, "voice_waveform", None),
     }
+
+
+def normalize_voice_waveform(raw: str | None) -> str | None:
+    """
+    Validates a client-supplied voice waveform (JSON array of 0..1
+    amplitudes) and clamps every value. Returns the canonical JSON
+    string or None when the input is unusable.
+    """
+    if not raw:
+        return None
+
+    try:
+        arr = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+    if not isinstance(arr, list) or not arr:
+        return None
+
+    values: list[float] = []
+
+    for v in arr:
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
+            return None
+        values.append(max(0.0, min(1.0, float(v))))
+
+    if len(values) > 128:
+        values = values[:128]
+
+    return json.dumps(values)
 
 
 async def save_message(
@@ -57,6 +90,7 @@ async def save_message(
     file_size: int | None = None,
     reply_to_id: int | None = None,
     voice_duration: float | None = None,
+    voice_waveform: str | None = None,
 ) -> Message:
     message = Message(
         username=username,
@@ -69,6 +103,7 @@ async def save_message(
         file_size=file_size,
         reply_to_id=reply_to_id,
         voice_duration=voice_duration,
+        voice_waveform=voice_waveform,
     )
 
     db.add(message)

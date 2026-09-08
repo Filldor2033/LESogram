@@ -6,10 +6,12 @@
     let {
         src,
         durationSec,
+        waveform,
         own = false
     }: {
         src: string;
         durationSec?: number | null;
+        waveform?: string | null;
         own?: boolean;
     } = $props();
 
@@ -30,9 +32,36 @@
         fallbackDuration = durationSec ?? 0;
     });
 
+    /*
+     * Real waveform recorded on the client (JSON array of 0..1
+     * amplitudes). Falls back to a stable pseudo-waveform derived
+     * from the message id when absent (old messages).
+     */
+    let realBars = $derived.by(() => {
+        if (!waveform) return null;
+
+        try {
+            const arr = JSON.parse(waveform);
+
+            if (
+                !Array.isArray(arr) ||
+                arr.length === 0 ||
+                !arr.every((v) => typeof v === 'number' && Number.isFinite(v))
+            ) {
+                return null;
+            }
+
+            return arr.slice(0, 64).map((v: number) => Math.max(0.14, Math.min(1, v)));
+        } catch {
+            return null;
+        }
+    });
+
     // Synthetic pseudo-waveform derived from the message id —
     // stable per message, looks organic
     let bars = $derived.by(() => {
+        if (realBars) return realBars;
+
         const seedInput = src.slice(-24);
         let hash = 2166136261;
 
@@ -108,6 +137,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         class="voice-wave"
+        class:real-wave={realBars !== null}
         role="slider"
         aria-label={t('seek')}
         aria-valuemin={0}
@@ -116,11 +146,11 @@
         tabindex="0"
         onclick={seek}
     >
-        {#each bars as h, i}
+        {#each bars as h, i (i)}
             <div
                 class="voice-bar"
                 class:played={i / bars.length <= progress}
-                style="height: {Math.round(h * 100)}%"
+                style="height: {Math.max(14, Math.round(h * 100))}%"
             ></div>
         {/each}
     </div>

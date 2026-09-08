@@ -13,7 +13,12 @@ from api.deps import get_current_user_model, get_db
 from core.config import *
 from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from models import Message, User
-from services.messages import normalize_message_text, save_message, serialize_message
+from services.messages import (
+    normalize_message_text,
+    normalize_voice_waveform,
+    save_message,
+    serialize_message,
+)
 from services.rooms import require_room_access
 from services.uploads import (
     build_attachment_path,
@@ -76,6 +81,7 @@ async def upload_attachment(
     text: str = Form(default=""),
     reply_to_id: int | None = Form(default=None),
     voice_duration: float | None = Form(default=None),
+    voice_waveform: str | None = Form(default=None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_model),
@@ -192,6 +198,11 @@ async def upload_attachment(
         voice_duration=(
             round(voice_duration, 1)
             if content_type == "voice" and voice_duration is not None
+            else None
+        ),
+        voice_waveform=(
+            normalize_voice_waveform(voice_waveform)
+            if content_type == "voice"
             else None
         ),
     )

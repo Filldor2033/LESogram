@@ -77,6 +77,12 @@ class Message(Base):
         nullable=True,
     )
 
+    # JSON array of 0..1 amplitudes (voice messages)
+    voice_waveform: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
     __table_args__ = (Index("ix_messages_room_id", "room", "id"),)
 
 
