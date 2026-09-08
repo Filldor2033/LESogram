@@ -291,6 +291,65 @@ function resample(input: number[], target: number): number[] {
 }
 
 /**
+ * Resamples an amplitude track to a fixed bar count. Public wrapper
+ * for the pause-time segment waveform.
+ */
+export function resampleWave(input: number[], target: number): number[] {
+    return resample(input, target);
+}
+
+/**
+ * Decodes blobs to PCM, concatenates them end-to-end and re-encodes
+ * as one mono WAV. Returns null when any blob fails to decode (the
+ * caller falls back to the last part).
+ */
+export async function concatVoiceToWav(blobs: Blob[]): Promise<Blob | null> {
+    if (blobs.length === 0) return null;
+
+    try {
+        const ctx = new AudioContext();
+
+        const buffers: AudioBuffer[] = [];
+
+        for (const blob of blobs) {
+            const buf = await blob.arrayBuffer();
+            buffers.push(await ctx.decodeAudioData(buf.slice(0)));
+        }
+
+        const sampleRate = buffers[0].sampleRate;
+        let total = 0;
+
+        for (const b of buffers) {
+            total += b.length;
+        }
+
+        const mono = new Float32Array(total);
+
+        let offset = 0;
+
+        for (const b of buffers) {
+            const channels = Math.min(2, b.numberOfChannels);
+
+            for (let ch = 0; ch < channels; ch++) {
+                const data = b.getChannelData(ch);
+
+                for (let i = 0; i < b.length; i++) {
+                    mono[offset + i] += data[i] / channels;
+                }
+            }
+
+            offset += b.length;
+        }
+
+        void ctx.close();
+
+        return encodeWav(mono, sampleRate);
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Trims a recorded blob to [fromSec, toSec] and re-encodes as WAV.
  * Returns null when trimming is unnecessary or fails.
  */

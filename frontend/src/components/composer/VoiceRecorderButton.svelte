@@ -7,7 +7,9 @@
 
     import {
         VoiceRecorder,
+        concatVoiceToWav,
         formatVoiceDuration,
+        resampleWave,
         trimVoiceToWav
     } from '$lib/utils/voice-recorder';
 
@@ -34,26 +36,42 @@
     let paused = $state(false);
     let elapsed = $state(0);
     let levels = $state<number[]>([]);
+    let level = $state(0);
 
-    // trim state (on pause)
+    /*
+     * A recording is split into committed parts and a live segment.
+     * When the user trims on pause and then continues recording, the
+     * edited segment is committed (immutable) and new audio records
+     * as a fresh segment after it. On send everything is merged into
+     * one WAV.
+     */
+    let parts: Blob[] = [];
+    let baseDur = $state(0);
+
+    // Trim state for the CURRENT segment (seconds within it).
     let trimFrom = $state(0);
     let trimTo = $state(0);
     let dragging: 'from' | 'to' | null = null;
+
+    // Full-segment waveform shown while paused (the live bars are
+    // only a rolling window of the last seconds).
+    let segWave = $state<number[]>([]);
 
     let sending = $state(false);
 
     const MAX_DURATION = 300; // 5 min
     const MIN_TRIM = 0.3;
+    const WAVE_BARS = 56;
 
     $effect(() => {
         // Re-binds on every new recorder instance (created after each
-        // finish() so a bad-state recorder never leaks into the next one).
+        // finish()/commit so a bad-state recorder never leaks onward).
         const active = recorder;
 
         active.onTick = (sec) => {
-            elapsed = sec;
+            elapsed = baseDur + sec;
 
-            if (sec >= MAX_DURATION) {
+            if (elapsed >= MAX_DURATION) {
                 void pauseOrFinish();
             }
         };
@@ -61,15 +79,13 @@
         active.onAmplitude = (peak) => {
             level = peak;
 
-            if (levels.length < 56) {
+            if (levels.length < WAVE_BARS) {
                 levels = [...levels, peak];
             } else {
                 levels = [...levels.slice(1), peak];
             }
         };
     });
-
-    let level = $state(0);
 
     async function start() {
         if (recording || disabled) return;
@@ -83,6 +99,13 @@
             return;
         }
 
+        // Never inherit state from a previous session.
+        parts = [];
+        baseDur = 0;
+        trimFrom = 0;
+        trimTo = 0;
+        segWave = [];
+
         try {
             const perm = await navigator.permissions.query({
                 name: 'microphone' as PermissionName
@@ -93,8 +116,8 @@
             if (perm.state === 'denied') {
                 console.error(
                     '[voice] denied at permissions.query — this is either a site-level block,' +
-                    ' the global Chrome setting (chrome://settings/content/microphone),' +
-                    ' or an OS-level privacy block (Windows/macOS).'
+                        ' the global Chrome setting (chrome://settings/content/microphone),' +
+                        ' or an OS-level privacy block (Windows/macOS).'
                 );
                 onError('voiceMicBlocked');
                 return;
@@ -136,19 +159,29 @@
 
     /** Pause: freeze the recording and open the trim editor. */
     function togglePause() {
-        if (!recording) return;
+        if (!recording || sending) return;
 
         if (!paused) {
             recorder.pause();
             paused = true;
 
+            // The trim window covers the current segment.
             trimFrom = 0;
-            trimTo = elapsed;
+            trimTo = elapsed - baseDur;
+
+            // The editor shows the whole segment, not the rolling window.
+            segWave = resampleWave(recorder.amplitude, WAVE_BARS);
         } else {
-            // resume only if the trim handles are at the ends;
-            // otherwise the user is mid-edit — send button applies the trim
-            recorder.resume();
-            paused = false;
+            const seg = elapsed - baseDur;
+            const wantsTrim = trimFrom > 0.05 || trimTo < seg - 0.05;
+
+            if (wantsTrim) {
+                // Commit the edit and keep recording after it.
+                void commitTrimAndContinue();
+            } else {
+                recorder.resume();
+                paused = false;
+            }
         }
     }
 
@@ -160,12 +193,81 @@
         }
     }
 
+    /**
+     * Applies the trim made on pause and continues recording: the
+     * edited segment is frozen into `parts`, and a fresh recorder
+     * picks up where the kept audio ends.
+     */
+    async function commitTrimAndContinue() {
+        if (sending) return;
+        sending = true;
+
+        try {
+            const seg = elapsed - baseDur;
+            const part = await recorder.stop();
+
+            if (part) {
+                const wantsTrim =
+                    trimFrom > 0.05 || trimTo < seg - 0.05;
+
+                if (wantsTrim) {
+                    let trimmed: Blob | null = null;
+
+                    try {
+                        trimmed = await trimVoiceToWav(
+                            part.blob,
+                            trimFrom,
+                            trimTo
+                        );
+                    } catch {
+                        trimmed = null;
+                    }
+
+                    if (trimmed) {
+                        parts.push(trimmed);
+                        baseDur += trimTo - trimFrom;
+                    } else {
+                        // Decode failed — keep the segment uncut.
+                        console.error(
+                            '[voice] trim on continue failed — keeping the segment uncut'
+                        );
+                        parts.push(part.blob);
+                        baseDur += part.durationSec;
+                    }
+                } else {
+                    parts.push(part.blob);
+                    baseDur += part.durationSec;
+                }
+            }
+
+            const next = new VoiceRecorder();
+            await next.start();
+            recorder = next;
+
+            paused = false;
+            trimFrom = 0;
+            trimTo = 0;
+            segWave = [];
+        } catch (err) {
+            console.error('[voice] continue after trim failed:', err);
+            onError('voiceMicDenied');
+
+            // End the session — the user can start a new one.
+            recording = false;
+            paused = false;
+            parts = [];
+            baseDur = 0;
+            recorder = new VoiceRecorder();
+        } finally {
+            sending = false;
+        }
+    }
+
     async function finish() {
         if (!recording || sending) return;
 
-        // Normalize the trim window: if never opened (sent while
-        // recording), trimFrom/trimTo hold stale values from a
-        // previous session — reset to the full range.
+        // Sent while recording (not paused): keep the whole current
+        // segment — committed parts are already trimmed.
         let from = trimFrom;
         let to = trimTo;
 
@@ -174,8 +276,8 @@
             to = Number.POSITIVE_INFINITY;
         }
 
-        // Validate the trim range BEFORE stopping the recorder,
-        // so an invalid selection doesn't destroy the recording.
+        // Validate BEFORE stopping, so a bad selection doesn't
+        // destroy the recording.
         if (to - from < MIN_TRIM) {
             onError('voiceTrimTooShort');
             return;
@@ -188,51 +290,97 @@
             recording = false;
             paused = false;
 
-            if (!result) {
+            if (!result && parts.length === 0) {
                 onError('voiceTooShort');
                 return;
             }
 
-            if (to === Number.POSITIVE_INFINITY) {
-                to = result.durationSec;
+            let finalBlob: Blob | null = null;
+            let finalDur = 0;
+
+            if (result) {
+                const segDur = result.durationSec;
+                const toActual =
+                    to === Number.POSITIVE_INFINITY
+                        ? segDur
+                        : Math.min(to, segDur);
+
+                finalBlob = result.blob;
+                finalDur = segDur;
+
+                const wantsTrim =
+                    from > 0.05 || toActual < segDur - 0.05;
+
+                if (wantsTrim) {
+                    let trimmed: Blob | null = null;
+
+                    try {
+                        trimmed = await trimVoiceToWav(
+                            result.blob,
+                            from,
+                            toActual
+                        );
+                    } catch {
+                        trimmed = null;
+                    }
+
+                    if (trimmed) {
+                        finalBlob = trimmed;
+                        finalDur = toActual - from;
+                    } else {
+                        console.error(
+                            '[voice] trim decode failed — sending the segment uncut'
+                        );
+                    }
+                }
             }
 
-            // Apply trim if the handles moved
-            const wantsTrim = from > 0.05 || to < result.durationSec - 0.05;
+            if (parts.length > 0) {
+                const blobs = finalBlob ? [...parts, finalBlob] : parts;
 
-            if (wantsTrim) {
-                const trimmed = await trimVoiceToWav(result.blob, from, to);
+                const merged = await concatVoiceToWav(blobs);
 
-                if (trimmed) {
-                    onSend(trimmed, Math.round((to - from) * 10) / 10);
+                if (merged) {
+                    onSend(
+                        merged,
+                        Math.round((baseDur + finalDur) * 10) / 10
+                    );
                 } else {
-                    // trim failed to decode — send original
-                    onSend(result.blob, result.durationSec);
+                    console.error(
+                        '[voice] concat failed — sending the last part only'
+                    );
+
+                    const last = finalBlob ?? parts[parts.length - 1];
+                    onSend(last, Math.round(finalDur * 10) / 10);
                 }
             } else {
-                onSend(result.blob, result.durationSec);
+                onSend(finalBlob!, Math.round(finalDur * 10) / 10);
             }
         } catch (err) {
             console.error('[voice] finish failed:', err);
             onError('voiceSendFailed');
         } finally {
             sending = false;
-            trimFrom = 0;
-            trimTo = 0;
-
-            // Fresh recorder instance for the next session — a
-            // recorder that ended in a bad state must never leak
-            // into the next recording.
-            recorder = new VoiceRecorder();
+            resetSession();
         }
     }
 
     async function cancel() {
-        if (!recording) return;
+        if (!recording || sending) return;
 
         await recorder.cancel();
         recording = false;
         paused = false;
+        resetSession();
+    }
+
+    function resetSession() {
+        parts = [];
+        baseDur = 0;
+        trimFrom = 0;
+        trimTo = 0;
+        segWave = [];
+        recorder = new VoiceRecorder();
     }
 
     // ---- trim dragging ----
@@ -274,26 +422,28 @@
     function moveDragAt(clientX: number) {
         if (!dragBars || !dragging) return;
 
+        const seg = elapsed - baseDur;
+        if (seg <= 0) return;
+
         const rect = dragBars.getBoundingClientRect();
         const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
 
         if (dragging === 'from') {
-            trimFrom = Math.max(0, Math.min(frac * elapsed, trimTo - MIN_TRIM));
+            trimFrom = Math.max(0, Math.min(frac * seg, trimTo - MIN_TRIM));
         } else if (dragging === 'to') {
-            trimTo = Math.min(elapsed, Math.max(frac * elapsed, trimFrom + MIN_TRIM));
+            trimTo = Math.min(seg, Math.max(frac * seg, trimFrom + MIN_TRIM));
         }
     }
 
-
-
     function resetTrim() {
         trimFrom = 0;
-        trimTo = elapsed;
+        trimTo = elapsed - baseDur;
     }
 
-    const fromPct = $derived(elapsed > 0 ? (trimFrom / elapsed) * 100 : 0);
-    const toPct = $derived(elapsed > 0 ? (trimTo / elapsed) * 100 : 100);
-    const keepDur = $derived(trimTo - trimFrom);
+    const segElapsed = $derived(elapsed - baseDur);
+    const fromPct = $derived(segElapsed > 0 ? (trimFrom / segElapsed) * 100 : 0);
+    const toPct = $derived(segElapsed > 0 ? (trimTo / segElapsed) * 100 : 100);
+    const keepDur = $derived(baseDur + (trimTo - trimFrom));
 
     onDestroy(() => {
         void recorder.cancel();
@@ -321,23 +471,34 @@
 
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="voice-rec-bars" class:editable={paused}>
-                <div
-                    class="vbar-mask left"
-                    style="width: {fromPct}%"
-                ></div>
-                <div
-                    class="vbar-mask right"
-                    style="width: {100 - toPct}%"
-                ></div>
-
-                {#each levels as l, i (i)}
+                {#if paused}
                     <div
-                        class="vbar"
-                        style="height: {Math.max(14, Math.round((0.14 + l * 0.86) * 100))}%"
+                        class="vbar-mask left"
+                        style="width: {fromPct}%"
                     ></div>
+                    <div
+                        class="vbar-mask right"
+                        style="width: {100 - toPct}%"
+                    ></div>
+                {/if}
+
+                {#if paused && segWave.length > 0}
+                    {#each segWave as l, i (i)}
+                        <div
+                            class="vbar"
+                            style="height: {Math.max(14, Math.round((0.14 + l * 0.86) * 100))}%"
+                        ></div>
+                    {/each}
                 {:else}
-                    <div class="vbar" style="height: 16%"></div>
-                {/each}
+                    {#each levels as l, i (i)}
+                        <div
+                            class="vbar"
+                            style="height: {Math.max(14, Math.round((0.14 + l * 0.86) * 100))}%"
+                        ></div>
+                    {:else}
+                        <div class="vbar" style="height: 16%"></div>
+                    {/each}
+                {/if}
 
                 {#if paused}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -362,7 +523,7 @@
                         role="slider"
                         aria-label="trim end"
                         aria-valuemin={Math.round(trimFrom + MIN_TRIM)}
-                        aria-valuemax={Math.round(elapsed)}
+                        aria-valuemax={Math.round(segElapsed)}
                         aria-valuenow={Math.round(trimTo)}
                         tabindex="0"
                     ></div>
@@ -391,7 +552,7 @@
                 title={t('voiceTrimReset')}
                 aria-label={t('voiceTrimReset')}
                 onclick={resetTrim}
-                disabled={trimFrom === 0 && trimTo === elapsed}
+                disabled={trimFrom === 0 && trimTo === segElapsed}
             >
                 <Icon name="refresh" size={15} />
             </button>
