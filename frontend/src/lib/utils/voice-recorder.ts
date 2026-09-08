@@ -362,7 +362,10 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
 
 export function formatVoiceDuration(sec: number): string {
     if (!Number.isFinite(sec)) return '0:00';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
+    // Round to nearest: a 1.8s recording should show 0:02, not 0:01
+    // (floor clipped nearly a full second off trimmed messages).
+    const total = Math.round(sec);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
