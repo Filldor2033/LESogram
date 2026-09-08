@@ -91,8 +91,24 @@
             elapsed = 0;
             levels = [];
         } catch (err) {
-            if (err instanceof DOMException && err.name === 'NotAllowedError') {
-                onError('voiceMicBlocked');
+            console.error('[voice] getUserMedia failed:', err);
+
+            if (err instanceof DOMException) {
+                switch (err.name) {
+                    case 'NotAllowedError':
+                    case 'SecurityError':
+                        onError('voiceMicBlocked');
+                        break;
+                    case 'NotFoundError':
+                        onError('voiceNoDevice');
+                        break;
+                    case 'NotReadableError':
+                    case 'OverconstrainedError':
+                        onError('voiceMicBusy');
+                        break;
+                    default:
+                        onError('voiceMicDenied');
+                }
             } else {
                 onError('voiceMicDenied');
             }
