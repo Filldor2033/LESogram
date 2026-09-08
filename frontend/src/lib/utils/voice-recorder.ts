@@ -176,7 +176,10 @@ export class VoiceRecorder {
             this.intervalId = null;
         }
 
-        const durationSec = (performance.now() - this.startedAt) / 1000;
+        // Exclude paused time: the recorded audio contains no
+        // paused segments, so the duration must not count them.
+        const durationSec =
+            (performance.now() - this.startedAt - this.pausedTotal) / 1000;
 
         const blob = await new Promise<Blob>((resolve) => {
             if (!this.recorder) {
@@ -191,7 +194,26 @@ export class VoiceRecorder {
                 return;
             }
 
-            rec.onstop = () => resolve(new Blob(this.chunks));
+            let settled = false;
+
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                resolve(new Blob(this.chunks));
+            };
+
+            rec.onstop = finish;
+            rec.onerror = finish;
+
+            // Safety net: if onstop never fires (browser quirk),
+            // resolve with whatever chunks exist after 2s.
+            const timeout = window.setTimeout(finish, 2000);
+
+            const clear = () => window.clearTimeout(timeout);
+            rec.onstop = () => {
+                clear();
+                finish();
+            };
 
             // Chrome drops buffered data when stop() is called on a
             // paused recorder — resume first, then stop.

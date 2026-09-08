@@ -2731,7 +2731,7 @@ body {
     min-width: 0;
     height: 100%;
     overflow: hidden;
-    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    position: relative;
 }
 
 .voice-rec-bars .vbar {

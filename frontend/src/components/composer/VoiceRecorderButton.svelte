@@ -28,7 +28,7 @@
         disabled?: boolean;
     } = $props();
 
-    let recorder = new VoiceRecorder();
+    let recorder = $state(new VoiceRecorder());
 
     let recording = $state(false);
     let paused = $state(false);
@@ -46,7 +46,11 @@
     const MIN_TRIM = 0.3;
 
     $effect(() => {
-        recorder.onTick = (sec) => {
+        // Re-binds on every new recorder instance (created after each
+        // finish() so a bad-state recorder never leaks into the next one).
+        const active = recorder;
+
+        active.onTick = (sec) => {
             elapsed = sec;
 
             if (sec >= MAX_DURATION) {
@@ -54,7 +58,7 @@
             }
         };
 
-        recorder.onAmplitude = (peak) => {
+        active.onAmplitude = (peak) => {
             level = peak;
 
             if (levels.length < 56) {
@@ -159,9 +163,20 @@
     async function finish() {
         if (!recording || sending) return;
 
+        // Normalize the trim window: if never opened (sent while
+        // recording), trimFrom/trimTo hold stale values from a
+        // previous session — reset to the full range.
+        let from = trimFrom;
+        let to = trimTo;
+
+        if (!paused) {
+            from = 0;
+            to = Number.POSITIVE_INFINITY;
+        }
+
         // Validate the trim range BEFORE stopping the recorder,
         // so an invalid selection doesn't destroy the recording.
-        if (paused && trimTo - trimFrom < MIN_TRIM) {
+        if (to - from < MIN_TRIM) {
             onError('voiceTrimTooShort');
             return;
         }
@@ -178,22 +193,18 @@
                 return;
             }
 
+            if (to === Number.POSITIVE_INFINITY) {
+                to = result.durationSec;
+            }
+
             // Apply trim if the handles moved
-            const wantsTrim =
-                trimFrom > 0.05 || trimTo < result.durationSec - 0.05;
+            const wantsTrim = from > 0.05 || to < result.durationSec - 0.05;
 
             if (wantsTrim) {
-                const trimmed = await trimVoiceToWav(
-                    result.blob,
-                    trimFrom,
-                    trimTo
-                );
+                const trimmed = await trimVoiceToWav(result.blob, from, to);
 
                 if (trimmed) {
-                    onSend(
-                        trimmed,
-                        Math.round((trimTo - trimFrom) * 10) / 10
-                    );
+                    onSend(trimmed, Math.round((to - from) * 10) / 10);
                 } else {
                     // trim failed to decode — send original
                     onSend(result.blob, result.durationSec);
@@ -208,6 +219,11 @@
             sending = false;
             trimFrom = 0;
             trimTo = 0;
+
+            // Fresh recorder instance for the next session — a
+            // recorder that ended in a bad state must never leak
+            // into the next recording.
+            recorder = new VoiceRecorder();
         }
     }
 
@@ -225,29 +241,41 @@
     // is meaningless inside window-level mousemove handlers.
     let dragBars: HTMLElement | null = null;
 
-    function startDrag(which: 'from' | 'to', e: MouseEvent) {
+    function startDrag(which: 'from' | 'to', e: MouseEvent | TouchEvent) {
         e.stopPropagation();
         dragging = which;
         dragBars = (e.currentTarget as HTMLElement).closest('.voice-rec-bars');
 
-        const move = (ev: MouseEvent) => moveDrag(ev);
+        const clientX = (ev: MouseEvent | TouchEvent): number =>
+            ev instanceof MouseEvent
+                ? ev.clientX
+                : ev.touches[0]?.clientX ?? 0;
+
+        const move = (ev: MouseEvent | TouchEvent) => {
+            ev.preventDefault();
+            moveDragAt(clientX(ev));
+        };
 
         const up = () => {
             dragging = null;
             dragBars = null;
-            window.removeEventListener('mousemove', move);
+            window.removeEventListener('mousemove', move as (ev: MouseEvent) => void);
             window.removeEventListener('mouseup', up);
+            window.removeEventListener('touchmove', move as (ev: TouchEvent) => void);
+            window.removeEventListener('touchend', up);
         };
 
-        window.addEventListener('mousemove', move);
+        window.addEventListener('mousemove', move as (ev: MouseEvent) => void);
         window.addEventListener('mouseup', up);
+        window.addEventListener('touchmove', move as (ev: TouchEvent) => void, { passive: false });
+        window.addEventListener('touchend', up);
     }
 
-    function moveDrag(e: MouseEvent) {
+    function moveDragAt(clientX: number) {
         if (!dragBars || !dragging) return;
 
         const rect = dragBars.getBoundingClientRect();
-        const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
 
         if (dragging === 'from') {
             trimFrom = Math.max(0, Math.min(frac * elapsed, trimTo - MIN_TRIM));
@@ -255,6 +283,8 @@
             trimTo = Math.min(elapsed, Math.max(frac * elapsed, trimFrom + MIN_TRIM));
         }
     }
+
+
 
     function resetTrim() {
         trimFrom = 0;
@@ -315,6 +345,7 @@
                         class="trim-handle from"
                         style="left: calc({fromPct}% - 7px)"
                         onmousedown={(e) => startDrag('from', e)}
+                        ontouchstart={(e) => startDrag('from', e)}
                         role="slider"
                         aria-label="trim start"
                         aria-valuemin={0}
@@ -327,6 +358,7 @@
                         class="trim-handle to"
                         style="left: calc({toPct}% - 7px)"
                         onmousedown={(e) => startDrag('to', e)}
+                        ontouchstart={(e) => startDrag('to', e)}
                         role="slider"
                         aria-label="trim end"
                         aria-valuemin={Math.round(trimFrom + MIN_TRIM)}
