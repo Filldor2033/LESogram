@@ -702,6 +702,7 @@ select {
     width: var(--sidebar-width);
     min-width: var(--sidebar-width);
     flex-shrink: 0;
+    container-type: inline-size;
 }
 
 .chat-panel {
@@ -1119,6 +1120,67 @@ select {
     color: #04120a;
     box-shadow: 0 10px 20px rgba(22, 163, 74, 0.20);
 }
+
+/* --- header: one compact row — brand left, profile + language right.
+   The panel is narrow (~340px): the brand subtitle is the flexible part,
+   profile button shrinks to icon-only when tight, nothing may overflow. */
+
+.header-row {
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+.brand {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.brand-copy {
+    min-width: 0;
+}
+
+.brand-subtitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.header-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.profile-btn {
+    flex-shrink: 1;
+    max-width: 130px;
+}
+
+.lang-switch {
+    flex-shrink: 0;
+}
+
+.lang-btn {
+    min-width: 40px;
+    padding: 8px 8px;
+}
+
+/* narrow panel (container query — the panel, not the viewport, is narrow):
+   the profile button collapses to its avatar so the brand subtitle keeps
+   readable space */
+@container (max-width: 420px) {
+    .profile-btn {
+        max-width: 40px;
+        padding: 5px;
+    }
+
+    .profile-btn-name {
+        display: none;
+    }
+}
+
 
 .section-block {
     padding: 14px;
