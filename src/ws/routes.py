@@ -17,11 +17,25 @@ from ws.manager import manager
 router = APIRouter()
 
 
+# Origins of the native Android app (Capacitor WebView) — the app talks
+# to the server cross-origin by design, same as a trusted first-party
+# client.
+NATIVE_APP_ORIGINS = {
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
+}
+
+
 def websocket_origin_allowed(websocket: WebSocket) -> bool:
     origin = websocket.headers.get("origin")
     host = websocket.headers.get("host")
 
     if not origin or not host:
+        return True
+
+    if origin.lower() in NATIVE_APP_ORIGINS:
         return True
 
     parsed = urlparse(origin)
