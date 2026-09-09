@@ -29,6 +29,7 @@
 html {
     height: 100%;
     -webkit-text-size-adjust: 100%;
+    overflow-x: clip;
 }
 
 #app {
@@ -1919,12 +1920,14 @@ body {
         transform: translateX(18%);
         opacity: 0;
         pointer-events: none;
+        visibility: hidden;
     }
 
     .container[data-mobile-view='chat'] .panel {
         transform: translateX(-18%);
         opacity: 0;
         pointer-events: none;
+        visibility: hidden;
     }
 
     /*
@@ -3497,6 +3500,15 @@ body {
     align-items: center;
     gap: 7px;
     margin-bottom: 4px;
+}
+
+.msg-username.clickable {
+    cursor: pointer;
+}
+
+.msg-username.clickable:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 /* While the voice recorder is active the message input/attach/send leave

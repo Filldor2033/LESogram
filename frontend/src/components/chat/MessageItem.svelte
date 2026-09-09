@@ -6,6 +6,10 @@
     import Avatar from '$components/common/Avatar.svelte';
 
     import {
+        profileState
+    } from '$lib/state/profile.svelte';
+
+    import {
         authState
     } from '$lib/state/auth.svelte';
 
@@ -101,7 +105,7 @@
 
         if (
             target.closest(
-                'a, button, video, input, textarea'
+                'a, button, video, input, textarea, .msg-author'
             )
         ) {
             return;
@@ -137,6 +141,14 @@
             return;
         }
 
+        const target = event.target as HTMLElement;
+
+        if (
+            target.closest('.msg-author')
+        ) {
+            return;
+        }
+
         event.preventDefault();
 
         openContext(
@@ -163,7 +175,23 @@
             clickToProfile={true}
         />
 
-        <span class="msg-username">
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <span
+            class="msg-username"
+            class:clickable={true}
+            role="button"
+            tabindex="0"
+            onclick={(e) => {
+                e.stopPropagation();
+                profileState.viewing = message.username ?? '';
+            }}
+            onkeydown={(e) => {
+                if (e.key === 'Enter') {
+                    profileState.viewing = message.username ?? '';
+                }
+            }}
+        >
             {message.display_name || message.username}
         </span>
     </div>
