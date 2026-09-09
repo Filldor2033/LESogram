@@ -3,6 +3,8 @@
         Message
     } from '$lib/types/message';
 
+    import Avatar from '$components/common/Avatar.svelte';
+
     import {
         authState
     } from '$lib/state/auth.svelte';
@@ -152,8 +154,18 @@
         />
     {/if}
 
-    <div class="msg-username">
-        {message.username}
+    <div class="msg-author">
+        <Avatar
+            username={message.username ?? ''}
+            displayName={message.display_name}
+            url={message.avatar_url}
+            size={24}
+            clickToProfile={true}
+        />
+
+        <span class="msg-username">
+            {message.display_name || message.username}
+        </span>
     </div>
 
     <MessageAttachment

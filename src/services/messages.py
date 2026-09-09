@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import MAX_MESSAGE_LENGTH
-from models import Message, MessageReaction
+from models import Message, MessageReaction, User
 
 
 def normalize_message_text(text: str | None, *, allow_empty: bool) -> str:
@@ -23,10 +23,41 @@ def normalize_message_text(text: str | None, *, allow_empty: bool) -> str:
     return normalized
 
 
+async def enrich_messages_with_authors(
+    db: AsyncSession, messages: list[Message]
+) -> None:
+    """
+    Attaches author_display_name / author_avatar_url to each message
+    (single batched query), so serialize_message can include them.
+    """
+    if not messages:
+        return
+
+    usernames = {m.username for m in messages}
+
+    result = await db.execute(
+        select(User.username, User.display_name, User.avatar_url).where(
+            User.username.in_(usernames)
+        )
+    )
+
+    authors = {
+        row.username: (row.display_name, row.avatar_url)
+        for row in result.all()
+    }
+
+    for m in messages:
+        display_name, avatar_url = authors.get(m.username, (None, None))
+        m.author_display_name = display_name  # type: ignore[attr-defined]
+        m.author_avatar_url = avatar_url  # type: ignore[attr-defined]
+
+
 def serialize_message(message: Message) -> dict:
     attachment_url = f"/attachments/{message.id}" if message.media_url else None
 
     return {
+        "display_name": getattr(message, "author_display_name", None),
+        "avatar_url": getattr(message, "author_avatar_url", None),
         "id": message.id,
         "type": "message",
         "username": message.username,

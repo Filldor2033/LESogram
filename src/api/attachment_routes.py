@@ -207,6 +207,8 @@ async def upload_attachment(
         ),
     )
 
+    await enrich_messages_with_authors(db, [message])
+
     payload = serialize_message(message)
     await manager.broadcast_json(payload, room)
 

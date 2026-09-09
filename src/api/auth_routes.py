@@ -2,23 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_current_user_model, get_db
+from api.deps import get_db
 from auth import create_access_token, hash_password, verify_password
 from core.rate_limit import enforce_http_rate_limit
 from models import User
 from schemas import LoginRequest, RegisterRequest, TokenResponse
 
 router = APIRouter()
-
-
-@router.get("/me")
-async def get_me(
-    current_user: User = Depends(get_current_user_model),
-):
-    return {
-        "username": current_user.username,
-        "is_admin": bool(current_user.is_admin),
-    }
 
 
 @router.post("/register")

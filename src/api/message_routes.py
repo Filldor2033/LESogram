@@ -9,6 +9,7 @@ from models import Message, MessageReaction, User
 from schemas import EditMessageRequest, ReactionRequest
 from services.messages import (
     Reactions,
+    enrich_messages_with_authors,
     get_reactions_for_messages,
     normalize_message_text,
     serialize_message,
@@ -51,6 +52,8 @@ async def get_messages(
     messages.reverse()
 
     next_before_id = messages[0].id if messages else None
+
+    await enrich_messages_with_authors(db, messages)
 
     reaction_map = await get_reactions_for_messages(
         db, [message.id for message in messages]

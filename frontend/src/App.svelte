@@ -4,6 +4,15 @@
     import LanguageSwitch
         from '$components/common/LanguageSwitch.svelte';
 
+    import ProfileButton
+        from '$components/profile/ProfileButton.svelte';
+
+    import ProfileModal
+        from '$components/profile/ProfileModal.svelte';
+
+    import ProfileCard
+        from '$components/profile/ProfileCard.svelte';
+
     import AuthPanel
         from '$components/auth/AuthPanel.svelte';
 
@@ -30,6 +39,10 @@
         uiState
     } from '$lib/state/ui.svelte';
 
+    import {
+        profileState
+    } from '$lib/state/profile.svelte';
+
     let bootstrapping =
         $state(true);
 
@@ -47,6 +60,7 @@
                     !disposed
                 ) {
                     await roomsState.load();
+                    void profileState.refresh();
                 }
             } finally {
                 if (!disposed) {
@@ -100,6 +114,7 @@
 
     async function authenticated() {
         await roomsState.load();
+        void profileState.refresh();
     }
 </script>
 
@@ -128,7 +143,13 @@
                     </div>
                 </div>
 
-                <LanguageSwitch />
+                <div class="header-actions">
+                    {#if authState.authenticated}
+                        <ProfileButton />
+                    {/if}
+
+                    <LanguageSwitch />
+                </div>
             </div>
         </div>
 
@@ -152,4 +173,7 @@
     </div>
 
     <ChatPanel />
+
+    <ProfileModal />
+    <ProfileCard />
 </div>

@@ -34,6 +34,17 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+class ProfileUpdateRequest(BaseModel):
+    display_name: str | None = Field(
+        default=None, min_length=1, max_length=50
+    )
+    bio: str | None = Field(default=None, max_length=200)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=4, max_length=72)
+
 
 
 class CreateRoomRequest(BaseModel):

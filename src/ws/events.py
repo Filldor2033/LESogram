@@ -5,7 +5,11 @@ from sqlalchemy import select
 from core.config import MAX_MESSAGE_LENGTH
 from core.rate_limit import check_websocket_rate_limit
 from models import Message
-from services.messages import save_message, serialize_message
+from services.messages import (
+    enrich_messages_with_authors,
+    save_message,
+    serialize_message,
+)
 from services.parse import extract_mentions
 from services.rooms import room_members
 from utils.time import utc_now
@@ -133,6 +137,8 @@ async def handle_message_event(
             content_type="text",
             reply_to_id=reply_to_id,
         )
+
+    await enrich_messages_with_authors(db, [message])
 
     payload = serialize_message(message)
 

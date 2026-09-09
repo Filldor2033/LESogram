@@ -18,6 +18,9 @@
 
     import Icon
         from '$components/common/Icon.svelte';
+
+    import Avatar
+        from '$components/common/Avatar.svelte';
 </script>
 
 {#if roomUsersState.open}
@@ -76,11 +79,11 @@
                         (user.username)
                     }
                         <div class="user-item">
-                            <div class="user-avatar">
-                                {user.username
-                                    .slice(0, 1)
-                                    .toUpperCase()}
-                            </div>
+                            <Avatar
+                                username={user.username}
+                                size={38}
+                                clickToProfile={true}
+                            />
 
                             <div class="user-name">
                                 {user.username}

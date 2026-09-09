@@ -91,6 +91,44 @@ async def ensure_user_schema():
             f"is_admin BOOLEAN NOT NULL DEFAULT {boolean_default(conn)}",
         )
 
+        datetime_type = column_type(
+            conn,
+            sqlite_type="DATETIME",
+            postgres_type="TIMESTAMP",
+        )
+
+        await add_column_if_missing(
+            conn,
+            "users",
+            columns,
+            "display_name",
+            "display_name VARCHAR(50)",
+        )
+
+        await add_column_if_missing(
+            conn,
+            "users",
+            columns,
+            "bio",
+            "bio VARCHAR(200)",
+        )
+
+        await add_column_if_missing(
+            conn,
+            "users",
+            columns,
+            "avatar_url",
+            "avatar_url VARCHAR(500)",
+        )
+
+        await add_column_if_missing(
+            conn,
+            "users",
+            columns,
+            "created_at",
+            f"created_at {datetime_type}",
+        )
+
 
 async def ensure_message_schema():
     async with engine.begin() as conn:

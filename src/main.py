@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.attachment_routes import router as attachment_router
+from api.profile_routes import router as profile_router
 from api.auth_routes import router as auth_router
 from api.message_routes import router as message_router
 from api.room_routes import router as room_router
@@ -24,11 +25,13 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(room_router, prefix="/api")
 app.include_router(message_router, prefix="/api")
 app.include_router(attachment_router, prefix="/api")
+app.include_router(profile_router, prefix="/api")
 
 app.include_router(auth_router)
 app.include_router(room_router)
 app.include_router(message_router)
 app.include_router(attachment_router)
+app.include_router(profile_router)
 app.include_router(websocket_router)
 
 # New Svelte frontend build (frontend/dist): assets under /assets, root serves
