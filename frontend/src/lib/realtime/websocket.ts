@@ -1,3 +1,5 @@
+import { API_BASE } from '$lib/api/base';
+
 import type {
     ClientEvent,
     ServerEvent
@@ -21,15 +23,14 @@ export function connectRealtime(
 ): void {
     disconnectRealtime();
 
-    const protocol =
-        location.protocol === 'https:'
-            ? 'wss'
-            : 'ws';
-
+    /*
+     * Native app (Capacitor): API_BASE points at the server, connect
+     * there directly. Web: same origin, relative as before.
+     */
     const url =
-        `${protocol}://${location.host}` +
-        `/ws/${encodeURIComponent(room)}` +
-        `?room_token=${encodeURIComponent(roomToken)}`;
+        API_BASE !== ''
+            ? `${API_BASE.replace(/^http/, 'ws')}/ws/${encodeURIComponent(room)}?room_token=${encodeURIComponent(roomToken)}`
+            : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/${encodeURIComponent(room)}?room_token=${encodeURIComponent(roomToken)}`;
 
     const current =
         new WebSocket(url);
