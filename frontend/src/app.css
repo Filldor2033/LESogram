@@ -3499,15 +3499,20 @@ body {
     margin-bottom: 4px;
 }
 
-/* While the voice recorder is active the message input leaves the row —
-   otherwise on phones the recorder, input, attach and send buttons cramp
-   into one line and the waveform has no room. */
-#message-input.voice-active {
-    display: none;
-}
-
-/* Live recorder waveform: halve the bars on narrow screens too */
+/* While the voice recorder is active the message input/attach/send leave
+   the row — but ONLY on narrow screens: on desktop the row has room for
+   everything (input stays usable for typing alongside the recorder). */
 @media (max-width: 480px) {
+    #message-input.voice-active {
+        display: none;
+    }
+
+    .input-row .attach-btn.voice-hidden,
+    .input-row .send-btn.voice-hidden {
+        display: none;
+    }
+
+    /* Live recorder waveform: halve the bars on narrow screens too */
     .voice-rec-bars .vbar:nth-child(2n) {
         display: none;
     }

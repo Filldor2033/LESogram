@@ -611,7 +611,7 @@
     <div class="input-row">
         <button
             class="secondary tool-btn attach-btn"
-            class:hidden={composerState.voiceRecording}
+            class:voice-hidden={composerState.voiceRecording}
             style="max-width:40px"
             type="button"
             disabled={!chatState.active}
@@ -651,7 +651,7 @@
         <button
             class="send-btn"
             type="button"
-            class:hidden={composerState.voiceRecording}
+            class:voice-hidden={composerState.voiceRecording}
             disabled={
                 !chatState.active ||
                 composerState.uploading
