@@ -1,6 +1,8 @@
 <script lang="ts">
     import { profileState } from '$lib/state/profile.svelte';
 
+    import { API_BASE } from '$lib/api/base';
+
     let {
         username,
         displayName = null,
@@ -26,6 +28,11 @@
         return h;
     });
 
+    // Native app: avatar URLs are server-relative (/api/avatars/..)
+    const avatarSrc = $derived(
+        url ? (url.startsWith('http') ? url : `${API_BASE}${url}`) : null
+    );
+
     const initial = $derived.by(() => {
         const source = displayName?.trim() || username;
         return source.slice(0, 1).toUpperCase();
@@ -46,7 +53,7 @@
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <img
         class="avatar-img{clickToProfile ? ' clickable' : ''}"
-        src={url}
+        src={avatarSrc}
         alt={username}
         style="width: {size}px; height: {size}px"
         loading="lazy"

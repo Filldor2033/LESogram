@@ -1,4 +1,4 @@
-const API_PREFIX = '/api';
+import { API_PREFIX } from '$lib/api/base';
 
 export class ApiError extends Error {
     constructor(

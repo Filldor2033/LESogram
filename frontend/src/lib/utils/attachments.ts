@@ -1,3 +1,5 @@
+import { API_BASE } from '$lib/api/base';
+
 export function resolveAttachmentUrl(
     mediaUrl: string | undefined,
     roomToken: string
@@ -6,8 +8,15 @@ export function resolveAttachmentUrl(
         return '';
     }
 
+    /*
+     * Native app: media URLs come back from the API as absolute
+     * server paths (/attachments/.., /api/avatars/..) — prepend the
+     * API base. Web: same origin, keep as is.
+     */
+    const absolute = API_BASE !== '' ? `${API_BASE}${mediaUrl}` : mediaUrl;
+
     if (!roomToken) {
-        return mediaUrl;
+        return absolute;
     }
 
     const separator =
@@ -16,7 +25,7 @@ export function resolveAttachmentUrl(
             : '?';
 
     return (
-        mediaUrl +
+        absolute +
         separator +
         'room_token=' +
         encodeURIComponent(roomToken)
