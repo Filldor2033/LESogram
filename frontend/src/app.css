@@ -3169,13 +3169,18 @@ body {
 }
 
 .profile-close {
-    width: 30px;
-    height: 30px;
+    /* overrides the global input,button,select{width:100%;padding:11px 13px} */
+    width: 32px !important;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 !important;
+    display: grid;
+    place-items: center;
     border-radius: 8px;
     border: none;
     background: transparent;
     color: var(--muted-2);
-    font-size: 20px;
+    font-size: 22px;
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
@@ -3573,9 +3578,10 @@ body {
     }
 
     .profile-close {
-        width: 26px;
-        height: 26px;
-        font-size: 17px;
+        width: 28px !important;
+        height: 28px;
+        min-height: 28px;
+        font-size: 18px;
     }
 
     /* tabs scroll horizontally instead of wrapping out of the card */
