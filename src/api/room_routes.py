@@ -138,20 +138,34 @@ async def list_room_users(
 
     usernames = sorted(room_members.get(room, {}).keys(), key=str.lower)
 
-    admin_map = {}
+    user_map = {}
 
     if usernames:
         result = await db.execute(
-            select(User.username, User.is_admin).where(User.username.in_(usernames))
+            select(
+                User.username,
+                User.is_admin,
+                User.display_name,
+                User.avatar_url,
+            ).where(User.username.in_(usernames))
         )
         rows = result.all()
 
-        admin_map = {row.username: bool(row.is_admin) for row in rows}
+        user_map = {
+            row.username: {
+                "is_admin": bool(row.is_admin),
+                "display_name": row.display_name,
+                "avatar_url": row.avatar_url,
+            }
+            for row in rows
+        }
 
     users = [
         {
             "username": name,
-            "is_admin": admin_map.get(name, False),
+            "is_admin": user_map.get(name, {}).get("is_admin", False),
+            "display_name": user_map.get(name, {}).get("display_name"),
+            "avatar_url": user_map.get(name, {}).get("avatar_url"),
         }
         for name in usernames
     ]

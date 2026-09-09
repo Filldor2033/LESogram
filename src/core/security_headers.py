@@ -7,7 +7,11 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    # The native app loads media cross-origin (its WebView origin is
+    # localhost); "same-origin" would make the browser block every
+    # <img>/<audio> pointing at the server. Media and API responses are
+    # public within the app; the page itself keeps X-Frame-Options DENY.
+    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(self), geolocation=()"
     )
