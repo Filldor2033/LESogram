@@ -3145,6 +3145,62 @@ body {
     border-bottom-color: var(--accent);
 }
 
+/* --- profile modal: scoped resets (the app's global `input, button, select
+   { width: 100% }` stretches every button to full width — undo it here) --- */
+
+.profile-modal button {
+    width: auto;
+    min-height: 0;
+    box-shadow: none;
+}
+
+.profile-modal button:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.profile-modal .profile-actions > button {
+    padding: 10px 26px;
+    min-height: 40px;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+.profile-modal .profile-actions {
+    justify-content: flex-end;
+}
+
+.profile-modal .avatar-controls .secondary {
+    padding: 9px 16px;
+    min-height: 38px;
+    font-size: 13px;
+    border-radius: 10px;
+}
+
+.profile-modal .role-btn {
+    padding: 6px 12px;
+    min-height: 32px;
+}
+
+.profile-modal .avatar-controls .secondary.danger {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.profile-modal .avatar-controls .secondary.danger:hover {
+    background: rgba(239, 68, 68, 0.16);
+}
+
+
+.profile-card-edit {
+    width: auto;
+    align-self: flex-start;
+    margin: 14px 20px 18px;
+    padding: 10px 22px;
+}
+
+
 .profile-body {
     padding: 18px 20px 20px;
     overflow-y: auto;
