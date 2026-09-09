@@ -14,6 +14,7 @@ from core.config import *
 from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
 from models import Message, User
 from services.messages import (
+    enrich_messages_with_authors,
     normalize_message_text,
     normalize_voice_waveform,
     save_message,
