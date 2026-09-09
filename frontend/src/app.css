@@ -3535,3 +3535,102 @@ body {
         display: none;
     }
 }
+
+/* --- profile modal on phones: compact and inside the screen --- */
+@media (max-width: 520px) {
+    .modal-overlay {
+        padding: 12px;
+    }
+
+    .modal.profile-modal {
+        width: 100%;
+        max-height: calc(100dvh - 24px);
+    }
+
+    .profile-head {
+        padding: 12px 12px 10px;
+        gap: 10px;
+    }
+
+    .profile-head-name {
+        font-size: 15px;
+    }
+
+    .profile-head-sub {
+        font-size: 12px;
+    }
+
+    .profile-close {
+        width: 26px;
+        height: 26px;
+        font-size: 17px;
+    }
+
+    /* tabs scroll horizontally instead of wrapping out of the card */
+    .profile-tabs {
+        padding: 8px 8px 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+    }
+
+    .profile-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .profile-tab {
+        padding: 8px 10px;
+        font-size: 12.5px;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    .profile-body {
+        padding: 14px 12px 14px;
+    }
+
+    .profile-form {
+        gap: 11px;
+    }
+
+    .field input,
+    .field textarea {
+        padding: 9px 11px;
+        font-size: 14px;
+        min-height: 40px;
+    }
+
+    .profile-modal .profile-actions > button {
+        padding: 9px 20px;
+        min-height: 38px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .stat-card {
+        padding: 10px;
+    }
+
+    .stat-value {
+        font-size: 17px;
+    }
+
+    .admin-row {
+        padding: 7px 8px;
+        gap: 8px;
+    }
+
+    .profile-card-bio {
+        padding: 10px 12px 12px;
+        font-size: 13.5px;
+    }
+
+    .profile-card-edit {
+        margin: 10px 12px 12px;
+        padding: 9px 18px;
+    }
+}
+
