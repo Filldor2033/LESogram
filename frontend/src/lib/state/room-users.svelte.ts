@@ -57,7 +57,15 @@ class RoomUsersState {
                             is_admin:
                                 Boolean(
                                     user.is_admin
-                                )
+                                ),
+
+                            display_name:
+                                user.display_name ??
+                                null,
+
+                            avatar_url:
+                                user.avatar_url ??
+                                null
                         };
                     });
         } catch (error) {

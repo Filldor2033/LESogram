@@ -58,7 +58,10 @@ body {
     align-items: stretch;
 
     padding:
-        max(var(--page-padding), env(safe-area-inset-top)) max(var(--page-padding), env(safe-area-inset-right)) max(var(--page-padding), env(safe-area-inset-bottom)) max(var(--page-padding), env(safe-area-inset-left));
+        max(var(--page-padding), env(safe-area-inset-top), var(--safe-area-inset-top, 0px))
+        max(var(--page-padding), env(safe-area-inset-right), var(--safe-area-inset-right, 0px))
+        max(var(--page-padding), env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px))
+        max(var(--page-padding), env(safe-area-inset-left), var(--safe-area-inset-left, 0px));
 
     overflow: hidden;
 }
@@ -3653,10 +3656,18 @@ body {
 }
 
 
-/* --- Native app: safe areas (notch / gesture bar) --- */
+/*
+ * --- Native app: safe areas (notch / gesture bar) ---
+ * Capacitor injects --safe-area-inset-* px variables on <html> (SystemBars
+ * plugin); newer WebViews also pass env() through with viewport-fit=cover.
+ * Take whichever is larger. The container's own --page-padding still applies
+ * via max().
+ */
 @supports (padding: env(safe-area-inset-top)) {
     body {
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
+        padding-top: max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px));
+        padding-right: max(env(safe-area-inset-right), var(--safe-area-inset-right, 0px));
+        padding-bottom: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
+        padding-left: max(env(safe-area-inset-left), var(--safe-area-inset-left, 0px));
     }
 }

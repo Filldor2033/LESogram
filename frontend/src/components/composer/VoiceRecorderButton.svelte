@@ -9,6 +9,7 @@
         VoiceRecorder,
         concatVoiceToWav,
         formatVoiceDuration,
+        isNativeApp,
         resampleWave,
         trimVoiceToWav
     } from '$lib/utils/voice-recorder';
@@ -153,7 +154,11 @@
                 switch (err.name) {
                     case 'NotAllowedError':
                     case 'SecurityError':
-                        onError('voiceMicBlocked');
+                        onError(
+                            isNativeApp()
+                                ? 'voiceMicBlockedApp'
+                                : 'voiceMicBlocked'
+                        );
                         break;
                     case 'NotFoundError':
                         onError('voiceNoDevice');

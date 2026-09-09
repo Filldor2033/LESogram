@@ -21,6 +21,8 @@ export interface JoinRoomResponse {
 export interface RoomUser {
     username: string;
     is_admin: boolean;
+    display_name?: string | null;
+    avatar_url?: string | null;
 }
 
 export type RawRoomUser =
@@ -28,6 +30,8 @@ export type RawRoomUser =
     | {
         username: string;
         is_admin?: boolean;
+        display_name?: string | null;
+        avatar_url?: string | null;
     };
 
 export interface RoomUsersResponse {

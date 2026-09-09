@@ -11,6 +11,21 @@ export interface VoiceRecording {
 
 const TARGET_SAMPLES = 48;
 
+/**
+ * True inside the native Android shell (Capacitor).
+ */
+export function isNativeApp(): boolean {
+    return typeof window !== 'undefined'
+        ? Boolean(
+              (
+                  window as unknown as {
+                      Capacitor?: { isNativePlatform?: () => boolean };
+                  }
+              ).Capacitor?.isNativePlatform?.()
+          )
+        : false;
+}
+
 export class VoiceRecorder {
     private stream: MediaStream | null = null;
     private recorder: MediaRecorder | null = null;
