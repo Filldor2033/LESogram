@@ -1167,23 +1167,6 @@ select {
     padding: 8px 8px;
 }
 
-/* narrow panel (container query — the panel, not the viewport, is narrow):
-   the profile button collapses to its avatar so the brand subtitle keeps
-   readable space */
-@container (max-width: 420px) {
-    .profile-btn {
-        width: 40px;
-        max-width: 40px;
-        min-height: 40px;
-        padding: 0;
-        display: grid;
-        place-items: center;
-    }
-
-    .profile-btn-name {
-        display: none;
-    }
-}
 
 
 .section-block {
@@ -3055,7 +3038,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 10px 5px 6px;
+    padding: 5px 9px;
     border-radius: 999px;
     border: 1px solid rgba(148, 163, 184, 0.18);
     background: rgba(2, 6, 23, 0.45);
@@ -3526,6 +3509,24 @@ body {
 /* Live recorder waveform: halve the bars on narrow screens too */
 @media (max-width: 480px) {
     .voice-rec-bars .vbar:nth-child(2n) {
+        display: none;
+    }
+}
+
+/* narrow panel (container query — the panel, not the viewport, is narrow):
+   the profile button collapses to its avatar so the brand subtitle keeps
+   readable space */
+@container (max-width: 420px) {
+    .profile-btn {
+        width: 40px;
+        max-width: 40px;
+        min-height: 40px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+    }
+
+    .profile-btn-name {
         display: none;
     }
 }
