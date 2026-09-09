@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -13,6 +14,21 @@ from core.security_headers import add_security_headers
 from ws.routes import router as websocket_router
 
 app = FastAPI(title="Realtime Chat", lifespan=lifespan)
+
+# First-party native app (Capacitor WebView) origins — the Android app
+# talks to the API cross-origin by design.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://localhost",
+        "http://localhost",
+        "capacitor://localhost",
+        "ionic://localhost",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.middleware("http")(add_security_headers)
 
