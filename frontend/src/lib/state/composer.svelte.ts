@@ -10,6 +10,9 @@ import type {
 class ComposerState {
     text = $state('');
 
+    /** True while the voice recorder UI is active (input hides). */
+    voiceRecording = $state(false);
+
     replyTarget =
         $state<Message | null>(null);
 

@@ -1172,8 +1172,12 @@ select {
    readable space */
 @container (max-width: 420px) {
     .profile-btn {
+        width: 40px;
         max-width: 40px;
-        padding: 5px;
+        min-height: 40px;
+        padding: 0;
+        display: grid;
+        place-items: center;
     }
 
     .profile-btn-name {
@@ -2823,6 +2827,7 @@ body {
     background: rgba(2, 6, 23, 0.22);
     border: 1px solid rgba(148, 163, 184, 0.08);
     min-width: 0;
+    max-width: 100%;
     width: fit-content;
 }
 
@@ -2856,7 +2861,8 @@ body {
     align-items: center;
     gap: 2px;
     height: 36px;
-    min-width: 150px;
+    min-width: 0;
+    flex: 1 1 auto;
     cursor: pointer;
     padding: 0 2px;
 }
@@ -2879,6 +2885,23 @@ body {
 .voice-wave.real-wave .voice-bar {
     background: rgba(148, 163, 184, 0.5);
 }
+
+/* Narrow screens: 56 fixed-width bars (>=278px) overflow a phone bubble.
+   Drop every other bar — the waveform stays readable and fits. */
+@media (max-width: 480px) {
+    .voice-wave .voice-bar:nth-child(2n) {
+        display: none;
+    }
+
+    .voice-wave {
+        gap: 3px;
+    }
+
+    .voice-time {
+        font-size: 11px;
+    }
+}
+
 
 .voice-wave.real-wave .voice-bar.played {
     background: var(--accent);
@@ -3491,4 +3514,18 @@ body {
     align-items: center;
     gap: 7px;
     margin-bottom: 4px;
+}
+
+/* While the voice recorder is active the message input leaves the row —
+   otherwise on phones the recorder, input, attach and send buttons cramp
+   into one line and the waveform has no room. */
+#message-input.voice-active {
+    display: none;
+}
+
+/* Live recorder waveform: halve the bars on narrow screens too */
+@media (max-width: 480px) {
+    .voice-rec-bars .vbar:nth-child(2n) {
+        display: none;
+    }
 }

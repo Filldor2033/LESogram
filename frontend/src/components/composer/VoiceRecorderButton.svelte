@@ -17,6 +17,10 @@
         t
     } from '$lib/i18n/i18n.svelte';
 
+    import {
+        composerState
+    } from '$lib/state/composer.svelte';
+
     let {
         onSend,
         onError,
@@ -138,6 +142,7 @@
         try {
             await recorder.start();
             recording = true;
+            composerState.voiceRecording = true;
             paused = false;
             elapsed = 0;
             levels = [];
@@ -437,11 +442,13 @@
         stopPreview();
         await recorder.cancel();
         recording = false;
+        composerState.voiceRecording = false;
         paused = false;
         resetSession();
     }
 
     function resetSession() {
+        composerState.voiceRecording = false;
         parts = [];
         partWaves = [];
         baseDur = 0;
