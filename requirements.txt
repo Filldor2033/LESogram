@@ -8,6 +8,7 @@ pwdlib[argon2]
 python-multipart
 pydantic
 pillow
+greenlet
 
 pytest
 pytest-asyncio
