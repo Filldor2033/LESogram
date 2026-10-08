@@ -3,17 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from fastapi.openapi.docs import get_swagger_ui_html
+
 from api.attachment_routes import router as attachment_router
 from api.profile_routes import router as profile_router
 from api.auth_routes import router as auth_router
 from api.message_routes import router as message_router
 from api.room_routes import router as room_router
+from api.bot_management_routes import router as bot_management_router
 from core.config import STATIC_DIR, WEB_DIR
 from core.lifespan import lifespan
 from core.security_headers import add_security_headers
 from ws.routes import router as websocket_router
 
-app = FastAPI(title="Realtime Chat", lifespan=lifespan)
+app = FastAPI(
+    title="Realtime Chat",
+    lifespan=lifespan,
+    docs_url=None,
+)
 
 # First-party native app (Capacitor WebView) origins — the Android app
 # talks to the API cross-origin by design.
@@ -35,6 +42,16 @@ app.middleware("http")(add_security_headers)
 # Old (legacy) frontend assets stay at /static.
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - Swagger UI",
+        swagger_js_url="/static/swagger/swagger-ui-bundle.js",
+        swagger_css_url="/static/swagger/swagger-ui.css",
+        swagger_favicon_url="/static/favicon.png",
+    )
+
 # New Svelte frontend calls REST under /api/*; media_url values returned by
 # the API point at /attachments/* (no prefix), so both spellings must work.
 app.include_router(auth_router, prefix="/api")
@@ -42,6 +59,7 @@ app.include_router(room_router, prefix="/api")
 app.include_router(message_router, prefix="/api")
 app.include_router(attachment_router, prefix="/api")
 app.include_router(profile_router, prefix="/api")
+app.include_router(bot_management_router, prefix="/api")
 
 app.include_router(auth_router)
 app.include_router(room_router)
