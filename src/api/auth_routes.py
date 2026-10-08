@@ -53,7 +53,7 @@ async def login(
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user or user.is_bot or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     token = create_access_token({"sub": user.username})

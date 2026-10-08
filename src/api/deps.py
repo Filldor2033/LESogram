@@ -32,7 +32,7 @@ async def get_current_user_model(
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
 
-    if not user:
+    if not user or user.is_bot:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     return user

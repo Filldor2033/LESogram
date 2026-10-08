@@ -56,7 +56,7 @@ async def authenticate_websocket(websocket: WebSocket, room: str):
         room_result = await db.execute(select(Room).where(Room.name == room))
         existing_room = room_result.scalar_one_or_none()
 
-    if not user or not existing_room:
+    if not user or user.is_bot or not existing_room:
         return None, None
 
     return username, user
