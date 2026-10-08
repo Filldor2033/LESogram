@@ -99,6 +99,54 @@ class Room(Base):
     )
 
 
+
+class BotUpdate(Base):
+    __tablename__ = "bot_updates"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    bot_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    room_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("rooms.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    update_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+    )
+
+    payload: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_bot_updates_bot_id_id",
+            "bot_id",
+            "id",
+        ),
+    )
+
+
 class BotRoomAccess(Base):
     __tablename__ = "bot_room_access"
 
