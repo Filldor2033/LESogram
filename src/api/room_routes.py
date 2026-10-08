@@ -32,6 +32,7 @@ async def list_rooms(
 
     return [
         {
+            "id": room.id,
             "name": room.name,
             "created_by": room.created_by,
             "created_at": room.created_at.isoformat(),
@@ -79,7 +80,11 @@ async def create_room(
     db.add(room)
     await db.commit()
 
-    return {"status": "created", "room": room_name}
+    return {
+        "status": "created",
+        "room": room_name,
+        "room_id": room.id,
+    }
 
 
 @router.post("/rooms/join")

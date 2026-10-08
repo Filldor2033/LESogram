@@ -11,6 +11,7 @@ from api.auth_routes import router as auth_router
 from api.message_routes import router as message_router
 from api.room_routes import router as room_router
 from api.bot_management_routes import router as bot_management_router
+from api.bot_room_routes import router as bot_room_router
 from core.config import STATIC_DIR, WEB_DIR
 from core.lifespan import lifespan
 from core.security_headers import add_security_headers
@@ -60,6 +61,7 @@ app.include_router(message_router, prefix="/api")
 app.include_router(attachment_router, prefix="/api")
 app.include_router(profile_router, prefix="/api")
 app.include_router(bot_management_router, prefix="/api")
+app.include_router(bot_room_router, prefix="/api")
 
 app.include_router(auth_router)
 app.include_router(room_router)
