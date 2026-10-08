@@ -129,6 +129,14 @@ async def ensure_user_schema():
             f"created_at {datetime_type}",
         )
 
+        await add_column_if_missing(
+            conn,
+            "users",
+            columns,
+            "is_bot",
+            f"is_bot BOOLEAN NOT NULL DEFAULT {boolean_default(conn)}",
+        )
+
 
 async def ensure_message_schema():
     async with engine.begin() as conn:

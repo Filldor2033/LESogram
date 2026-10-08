@@ -2,6 +2,8 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    false,
+    true,
     DateTime,
     ForeignKey,
     Index,
@@ -25,12 +27,57 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[str] = mapped_column(Boolean, default=False, nullable=False)
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
     # --- profile ---
     display_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     bio: Mapped[str | None] = mapped_column(String(200), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+class Bot(Base):
+    __tablename__ = "bots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+
+    owner_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        index=True,
+        nullable=False,
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=False,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=true(),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    token_rotated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
         nullable=False,
