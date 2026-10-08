@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_current_user_model, get_db
 from core.rate_limit import enforce_http_rate_limit_for_user
 from models import Bot, BotRoomAccess, Room, User
+from services.bot_updates import discard_bot_room_updates
 from services.permissions import can_delete_room
 
 
@@ -225,8 +226,17 @@ async def update_room_bot(
     if payload.can_read_messages is not None:
         access.can_read_messages = payload.can_read_messages
 
+        if payload.can_read_messages is False:
+            await discard_bot_room_updates(
+                db,
+                bot_id=bot_id,
+                room_id=room_id,
+            )
+
     if payload.can_send_messages is not None:
         access.can_send_messages = payload.can_send_messages
+
+    await db.commit()
 
     await db.commit()
 
@@ -256,6 +266,12 @@ async def remove_room_bot(
         )
 
     access, _, _ = row
+
+    await discard_bot_room_updates(
+        db,
+        bot_id=bot_id,
+        room_id=room_id,
+    )
 
     await db.delete(access)
     await db.commit()

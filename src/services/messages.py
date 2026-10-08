@@ -122,6 +122,7 @@ async def save_message(
     reply_to_id: int | None = None,
     voice_duration: float | None = None,
     voice_waveform: str | None = None,
+    commit: bool = True,
 ) -> Message:
     message = Message(
         username=username,
@@ -138,9 +139,12 @@ async def save_message(
     )
 
     db.add(message)
-    await db.commit()
-    await db.refresh(message)
+    await db.flush()
 
+    if commit:
+        await db.commit()
+
+    await db.refresh(message)
     return message
 
 
