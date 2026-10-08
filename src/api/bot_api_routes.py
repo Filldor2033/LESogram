@@ -1,3 +1,6 @@
+import asyncio
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -7,7 +10,9 @@ from api.bot_deps import get_current_bot
 from api.deps import get_db
 from core.rate_limit import rate_limiter
 from models import Bot, BotRoomAccess, Room, User
+from services.bot_updates import fetch_updates_for_bot
 from services.message_dispatch import publish_text_message
+from utils.time import utc_now
 
 
 router = APIRouter(
@@ -51,6 +56,31 @@ class SentMessageInfo(BaseModel):
 class SendMessageResponse(BaseModel):
     ok: bool
     result: SentMessageInfo
+
+
+class GetUpdatesRequest(BaseModel):
+    offset: int = Field(
+        default=0,
+        ge=0,
+        le=9223372036854775807,
+    )
+
+    limit: int = Field(
+        default=100,
+        ge=1,
+        le=100,
+    )
+
+    timeout: int = Field(
+        default=0,
+        ge=0,
+        le=30,
+    )
+
+
+class GetUpdatesResponse(BaseModel):
+    ok: bool
+    result: list[dict]
 
 
 @router.get(
@@ -167,3 +197,82 @@ async def send_message(
             "reply_to_id": message["reply_to_id"],
         },
     }
+
+
+@router.post(
+    "/getUpdates",
+    response_model=GetUpdatesResponse,
+)
+async def get_updates(
+    payload: GetUpdatesRequest,
+    response: Response,
+    bot: Bot = Depends(get_current_bot),
+    db: AsyncSession = Depends(get_db),
+):
+    # Save identifiers before any rollback
+    # (ORM objects may become expired).
+    bot_id = bot.id
+    expected_hash = bot.token_hash
+
+    # Request rate limit per bot
+    retry_after = await rate_limiter.hit(
+        "bot_get_updates",
+        str(bot_id),
+        120,
+        60,
+    )
+
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many getUpdates requests",
+            headers={
+                "Retry-After": str(retry_after),
+            },
+        )
+
+    response.headers["Cache-Control"] = "no-store"
+
+    loop = asyncio.get_running_loop()
+
+    # Monotonic deadline avoids system clock changes
+    deadline = loop.time() + payload.timeout
+
+    first_poll = True
+
+    # Retain up to seven days of updates
+    cleanup_before = utc_now() - timedelta(days=7)
+
+    while True:
+        updates = await fetch_updates_for_bot(
+            db,
+            bot_id=bot_id,
+            expected_token_hash=expected_hash,
+            offset=payload.offset,
+            limit=payload.limit,
+            acknowledge=first_poll,
+            cleanup_before=(
+                cleanup_before if first_poll else None
+            ),
+        )
+
+        first_poll = False
+
+        # Token rotated or bot disabled
+        if updates is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid bot token",
+            )
+
+        # We found events or reached the timeout
+        if updates or loop.time() >= deadline:
+            return {
+                "ok": True,
+                "result": updates,
+            }
+
+        # Wait without holding a DB transaction
+        await asyncio.sleep(
+            min(0.5, deadline - loop.time())
+        )
