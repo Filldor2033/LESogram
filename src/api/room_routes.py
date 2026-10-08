@@ -8,7 +8,7 @@ from api.deps import get_current_user, get_current_user_model, get_db
 from auth import create_access_token, hash_password, verify_password
 from core.config import ROOM_NAME_RE
 from core.rate_limit import enforce_http_rate_limit, enforce_http_rate_limit_for_user
-from models import Message, MessageReaction, Room, User
+from models import Message, MessageReaction, Room, User, BotRoomAccess
 from schemas import CreateRoomRequest, JoinRoomRequest
 from services.permissions import can_delete_room, can_skip_room_password
 from services.rooms import build_system_payload, require_room_access, room_members
@@ -216,6 +216,12 @@ async def delete_room(
         )
 
     await db.execute(delete(Message).where(Message.room == room_name))
+
+    await db.execute(
+        delete(BotRoomAccess).where(
+            BotRoomAccess.room_id == room.id
+        )
+    )
 
     await db.delete(room)
     await db.commit()

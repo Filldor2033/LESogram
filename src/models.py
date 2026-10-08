@@ -99,6 +99,57 @@ class Room(Base):
     )
 
 
+class BotRoomAccess(Base):
+    __tablename__ = "bot_room_access"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    bot_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    room_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("rooms.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    can_read_messages: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=false(),
+        nullable=False,
+    )
+
+    can_send_messages: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=false(),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "bot_id",
+            "room_id",
+            name="uq_bot_room_access_bot_room",
+        ),
+    )
+
+
 class Message(Base):
     __tablename__ = "messages"
 
