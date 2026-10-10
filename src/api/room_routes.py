@@ -1,7 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_current_user_model, get_db
@@ -136,7 +136,17 @@ async def list_room_users(
     if not existing_room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    usernames = sorted(room_members.get(room, {}).keys(), key=str.lower)
+    # Mention candidates and the participants list need everyone who
+    # belongs to the room's conversation — not just live WS sockets:
+    # authors from history + currently online members.
+    authors_result = await db.execute(
+        select(func.distinct(Message.username)).where(Message.room == room)
+    )
+    history_authors = {row[0] for row in authors_result.all() if row[0]}
+
+    online_now = set(room_members.get(room, {}).keys())
+
+    usernames = sorted(online_now | history_authors, key=str.lower)
 
     user_map = {}
 
@@ -166,6 +176,7 @@ async def list_room_users(
             "is_admin": user_map.get(name, {}).get("is_admin", False),
             "display_name": user_map.get(name, {}).get("display_name"),
             "avatar_url": user_map.get(name, {}).get("avatar_url"),
+            "online": name in online_now,
         }
         for name in usernames
     ]
