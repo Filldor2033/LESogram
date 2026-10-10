@@ -95,6 +95,13 @@ select {
     border-radius: 14px;
     background: rgba(34, 197, 94, 0.10);
     border-left: 3px solid var(--accent);
+    /* the quoted text block must shrink with the composer, never overflow */
+    min-width: 0;
+}
+
+.reply-preview-body {
+    min-width: 0;
+    flex: 1;
 }
 
 .reply-preview-title {
@@ -108,9 +115,12 @@ select {
     font-size: 13px;
     color: var(--muted-2);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 420px;
+    /* up to two lines, ellipsis beyond — fits any window width */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+    min-width: 0;
 }
 
 .reply-preview-close {
@@ -403,6 +413,20 @@ select {
     background: rgba(34, 197, 94, 0.12);
     padding: 1px 4px;
     border-radius: 6px;
+}
+
+.mention-link {
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    min-height: 0;
+    box-shadow: none;
+    transition: background 0.13s ease;
+}
+
+.mention-link:hover {
+    background: rgba(34, 197, 94, 0.26);
+    transform: none;
 }
 
 .mention-dropdown {
