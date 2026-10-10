@@ -1970,7 +1970,9 @@ body {
     }
 
     .container[data-mobile-view='rooms'] .chat-panel {
-        transform: translateX(18%);
+        /* slide LEFT behind the rooms panel — never pokes past the right
+           edge, so the layout viewport stays exactly the device width */
+        transform: translateX(-18%);
         opacity: 0;
         pointer-events: none;
         visibility: hidden;
