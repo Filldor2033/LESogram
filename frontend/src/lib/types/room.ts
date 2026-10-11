@@ -23,6 +23,7 @@ export interface RoomUser {
     is_admin: boolean;
     display_name?: string | null;
     avatar_url?: string | null;
+    online?: boolean;
 }
 
 export type RawRoomUser =
@@ -32,6 +33,10 @@ export type RawRoomUser =
         is_admin?: boolean;
         display_name?: string | null;
         avatar_url?: string | null;
+<<<<<<< HEAD
+=======
+        online?: boolean;
+>>>>>>> main
     };
 
 export interface RoomUsersResponse {

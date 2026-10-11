@@ -9,6 +9,7 @@ import type {
 export interface MessageTextPart {
     text: string;
     mention: boolean;
+    mentionUser?: string;
 }
 
 export function getSystemMessageText(
@@ -86,10 +87,17 @@ export function splitMessageText(
     return text
         .split(regex)
         .filter(Boolean)
-        .map(part => ({
-            text: part,
-            mention:
-                /^@[A-Za-z0-9_а-яА-ЯёЁ-]+$/
-                    .test(part)
-        }));
+        .map(part => {
+            const isMention =
+                /^@[A-Za-z0-9_а-яА-ЯёЁ-]+$/.test(part);
+
+            return {
+                text: part,
+                mention: isMention,
+                // bare username for the profile lookup
+                mentionUser: isMention
+                    ? part.slice(1)
+                    : undefined
+            };
+        });
 }

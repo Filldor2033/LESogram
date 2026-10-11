@@ -81,17 +81,22 @@
         }
 
         return roomUsersState.users
-            .map(user => user.username)
             .filter(
-                username =>
-                    username !==
+                user =>
+                    user.username !==
                         authState.username &&
-                    username
+                    user.username
                         .toLowerCase()
                         .includes(
                             mention!.query
                         )
             )
+            .sort(
+                (a, b) =>
+                    Number(b.online ?? false) -
+                    Number(a.online ?? false)
+            )
+            .map(user => user.username)
             .slice(0, 8);
     });
 

@@ -14,7 +14,7 @@
 
 {#if composerState.replyTarget}
     <div class="reply-preview">
-        <div>
+        <div class="reply-preview-body">
             <div class="reply-preview-title">
                 {composerState.replyTarget.username ||
                     t('reply')}
