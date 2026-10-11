@@ -53,15 +53,25 @@
             return;
         }
 
+        /*
+         * Match the VISIBLE bubble widths: the replying
+         * bubble renders the quote plus its own horizontal
+         * padding (13px/14px → 28px total), so the quote
+         * must be 28px narrower than the quoted bubble for
+         * both bubbles to end up exactly equal, like
+         * Telegram.
+         *
+         * The quoted bubble plays the msgIn entry animation
+         * (scale 0.98 → 1) and is fit-content, so a single
+         * early measure lands on a stale/shrunk width. The
+         * rAF double-frame re-measure below lets the layout
+         * settle; the ResizeObserver keeps it in sync on
+         * real changes (window resize, page load) while the
+         * equality guard ignores animation jitter.
+         */
+        let last = -1;
+
         const apply = () => {
-            /*
-             * Match the VISIBLE bubble widths: the replying
-             * bubble renders the quote plus its own horizontal
-             * padding (13px/14px → 28px total), so the quote
-             * must be 28px narrower than the quoted bubble for
-             * both bubbles to end up exactly equal, like
-             * Telegram.
-             */
             const width = Math.max(
                 80,
                 Math.round(
@@ -70,13 +80,23 @@
                         .width - 28
                 )
             );
+
+            if (width === last) {
+                return;
+            }
+
+            last = width;
             root.style.setProperty(
                 '--reply-w',
                 `${width}px`
             );
         };
 
-        apply();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(
+                apply
+            );
+        });
 
         const observer =
             new ResizeObserver(
