@@ -143,15 +143,16 @@ select {
 
     /*
      * Telegram-style quote sizing: --reply-w is set by
-     * MessageReply from the quoted bubble's live width, so
-     * the quote (and the replying bubble, which is a
-     * fit-content flex column) is exactly as wide as the
-     * message being replied to. Falls back to fit-content
-     * when the quoted message is not in the rendered page.
+     * MessageReply from the quoted bubble's live width. The
+     * quote NEVER stretches the replying bubble: the bubble
+     * sizes to its own content (fit-content), and the quote
+     * is capped at the quoted message's width via max-width.
+     * So a short reply to a long message keeps the quote
+     * wide (capped by the quoted bubble), and a long reply
+     * to a short message grows past the quote naturally.
      */
-    max-width: 100%;
+    max-width: var(--reply-w, 100%);
     min-width: 0;
-    width: var(--reply-w, fit-content);
     box-sizing: border-box;
 }
 
