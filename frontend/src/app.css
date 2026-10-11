@@ -140,6 +140,15 @@ select {
     border-left: 3px solid rgba(34, 197, 94, 0.75);
     font-size: 13px;
     cursor: pointer;
+
+    /*
+     * The bubble is a fit-content flex column; a long quoted
+     * text with white-space: nowrap measured its intrinsic
+     * width (1000px+) and blew the quote far past the bubble
+     * and the chat panel. Clamp to the bubble width instead.
+     */
+    max-width: 100%;
+    min-width: 0;
 }
 
 /*
@@ -198,8 +207,12 @@ select {
 .msg-reply-text {
     opacity: 0.85;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .msg-actions {
