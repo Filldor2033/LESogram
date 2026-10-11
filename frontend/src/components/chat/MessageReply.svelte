@@ -17,11 +17,66 @@
         replyToId: number;
     } = $props();
 
+    let root: HTMLDivElement;
+
     let replied = $derived(
         chatState.getMessage(
             replyToId
         )
     );
+
+    /*
+     * Telegram-style quote sizing: the quote (and thus the
+     * replying bubble) is as wide as the quoted message's
+     * bubble. Measured live via ResizeObserver so it follows
+     * window resizes; falls back to fit-content when the
+     * quoted message is not rendered in the current page.
+     */
+    $effect(() => {
+        void chatState.messages
+            .length;
+        if (!root) {
+            return;
+        }
+
+        const target =
+            document.querySelector<
+                HTMLElement
+            >(
+                `.msg[data-message-id="${replyToId}"]`
+            );
+
+        if (!target) {
+            root.style.removeProperty(
+                '--reply-w'
+            );
+            return;
+        }
+
+        const apply = () => {
+            const width = Math.round(
+                target
+                    .getBoundingClientRect()
+                    .width
+            );
+            root.style.setProperty(
+                '--reply-w',
+                `${width}px`
+            );
+        };
+
+        apply();
+
+        const observer =
+            new ResizeObserver(
+                apply
+            );
+        observer.observe(target);
+
+        return () => {
+            observer.disconnect();
+        };
+    });
 
     function scrollToReply() {
         const target = document.querySelector<HTMLElement>(
@@ -56,6 +111,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="msg-reply"
+    bind:this={root}
     onclick={scrollToReply}
 >
     <div class="msg-reply-author">

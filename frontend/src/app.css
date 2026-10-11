@@ -142,13 +142,17 @@ select {
     cursor: pointer;
 
     /*
-     * The bubble is a fit-content flex column; a long quoted
-     * text with white-space: nowrap measured its intrinsic
-     * width (1000px+) and blew the quote far past the bubble
-     * and the chat panel. Clamp to the bubble width instead.
+     * Telegram-style quote sizing: --reply-w is set by
+     * MessageReply from the quoted bubble's live width, so
+     * the quote (and the replying bubble, which is a
+     * fit-content flex column) is exactly as wide as the
+     * message being replied to. Falls back to fit-content
+     * when the quoted message is not in the rendered page.
      */
     max-width: 100%;
     min-width: 0;
+    width: var(--reply-w, fit-content);
+    box-sizing: border-box;
 }
 
 /*
@@ -207,12 +211,8 @@ select {
 .msg-reply-text {
     opacity: 0.85;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .msg-actions {
