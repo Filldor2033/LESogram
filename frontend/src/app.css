@@ -58,10 +58,7 @@ body {
     align-items: stretch;
 
     padding:
-        max(var(--page-padding), env(safe-area-inset-top), var(--safe-area-inset-top, 0px))
-        max(var(--page-padding), env(safe-area-inset-right), var(--safe-area-inset-right, 0px))
-        max(var(--page-padding), env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px))
-        max(var(--page-padding), env(safe-area-inset-left), var(--safe-area-inset-left, 0px));
+        max(var(--page-padding), env(safe-area-inset-top)) max(var(--page-padding), env(safe-area-inset-right)) max(var(--page-padding), env(safe-area-inset-bottom)) max(var(--page-padding), env(safe-area-inset-left));
 
     overflow: hidden;
 }
@@ -145,13 +142,18 @@ select {
     cursor: pointer;
 
     /*
-     * The bubble is a fit-content flex column; a long quoted
-     * text with white-space: nowrap measured its intrinsic
-     * width (1000px+) and blew the quote far past the bubble
-     * and the chat panel. Clamp to the bubble width instead.
+     * Telegram-style quote sizing: --reply-w is set by
+     * MessageReply from the quoted bubble's live width. The
+     * quote NEVER stretches the replying bubble: the bubble
+     * sizes to its own content (fit-content), and the quote
+     * is capped at the quoted message's width via max-width.
+     * So a short reply to a long message keeps the quote
+     * wide (capped by the quoted bubble), and a long reply
+     * to a short message grows past the quote naturally.
      */
-    max-width: 100%;
+    max-width: var(--reply-w, 100%);
     min-width: 0;
+    box-sizing: border-box;
 }
 
 /*
@@ -210,12 +212,8 @@ select {
 .msg-reply-text {
     opacity: 0.85;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .msg-actions {
@@ -3723,19 +3721,3 @@ body {
     }
 }
 
-
-/*
- * --- Native app: safe areas (notch / gesture bar) ---
- * Capacitor injects --safe-area-inset-* px variables on <html> (SystemBars
- * plugin); newer WebViews also pass env() through with viewport-fit=cover.
- * Take whichever is larger. The container's own --page-padding still applies
- * via max().
- */
-@supports (padding: env(safe-area-inset-top)) {
-    body {
-        padding-top: max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px));
-        padding-right: max(env(safe-area-inset-right), var(--safe-area-inset-right, 0px));
-        padding-bottom: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
-        padding-left: max(env(safe-area-inset-left), var(--safe-area-inset-left, 0px));
-    }
-}

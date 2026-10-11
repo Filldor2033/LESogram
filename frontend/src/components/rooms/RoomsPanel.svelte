@@ -21,6 +21,10 @@
     } from '$lib/state/chat.svelte';
 
     import {
+        closeChat
+    } from '$lib/services/chat-session';
+
+    import {
         uiState
     } from '$lib/state/ui.svelte';
 
@@ -33,6 +37,13 @@
         from '$components/common/Icon.svelte';
 
     function logout() {
+        /*
+         * Tear the open chat down before dropping the session:
+         * without closeChat() the panel stays mounted with the
+         * old room, its WebSocket keeps running and the message
+         * list remains visible next to the login screen.
+         */
+        closeChat();
         roomsState.clear();
         authState.logout();
     }

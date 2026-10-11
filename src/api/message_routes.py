@@ -156,6 +156,12 @@ async def edit_message(
     await db.commit()
     await db.refresh(message)
 
+    # Re-attach author profile fields: db.refresh() drops the
+    # ad-hoc author_display_name / author_avatar_url attributes
+    # the list endpoint sets, so without this the edit response
+    # would blank the avatar and display name in the chat.
+    await enrich_messages_with_authors(db, [message])
+
     payload_data = {
         "type": "message_edited",
         "room": message.room,
