@@ -54,10 +54,21 @@
         }
 
         const apply = () => {
-            const width = Math.round(
-                target
-                    .getBoundingClientRect()
-                    .width
+            /*
+             * Match the VISIBLE bubble widths: the replying
+             * bubble renders the quote plus its own horizontal
+             * padding (13px/14px → 28px total), so the quote
+             * must be 28px narrower than the quoted bubble for
+             * both bubbles to end up exactly equal, like
+             * Telegram.
+             */
+            const width = Math.max(
+                80,
+                Math.round(
+                    target
+                        .getBoundingClientRect()
+                        .width - 28
+                )
             );
             root.style.setProperty(
                 '--reply-w',
