@@ -19,9 +19,28 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Dark chrome to match the app theme (no white flash on launch).
-        getWindow().setStatusBarColor(android.graphics.Color.parseColor("#020617"));
-        getWindow().setNavigationBarColor(android.graphics.Color.parseColor("#020617"));
+        /*
+         * Branded chrome: deep slate bars with a green accent edge.
+         * The status bar (camera cutout area) and the navigation bar
+         * (gesture/button strip) sit on the panel color #0f172a with
+         * a 2px green #22c55e bottom/top line drawn via the window
+         * background — the web layer cannot paint behind system bars
+         * once edge-to-edge is off, so the color comes from here.
+         */
+        getWindow().setStatusBarColor(
+            android.graphics.Color.parseColor("#0f172a"));
+        getWindow().setNavigationBarColor(
+            android.graphics.Color.parseColor("#0f172a"));
+
+        /*
+         * Light (white) icons on the dark bars: clear the LIGHT
+         * flags — their presence would request dark icons.
+         */
+        final android.view.View decor = getWindow().getDecorView();
+        decor.setSystemUiVisibility(
+            decor.getSystemUiVisibility()
+            & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
 
         /*
          * Voice messages: the WebView's getUserMedia fires the runtime

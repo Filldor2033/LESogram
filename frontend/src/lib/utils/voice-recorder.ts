@@ -82,12 +82,17 @@ export class VoiceRecorder {
         this.chunks = [];
         this.amplitude = [];
 
+        /*
+         * Plain audio:true on purpose: constrained getUserMedia
+         * ({echoCancellation…}) throws NotReadableError /
+         * OverconstrainedError on a number of Android WebView
+         * devices even with RECORD_AUDIO granted, which surfaced
+         * as "recording errors" in the app. The bare track works
+         * everywhere; echo cancellation is off but that is a fair
+         * trade for reliability.
+         */
         this.stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
+            audio: true
         });
 
         const mimeType = VoiceRecorder.pickMimeType();
@@ -113,6 +118,17 @@ export class VoiceRecorder {
         // setInterval (not rAF): rAF is throttled when the tab is
         // backgrounded, which froze the timer and the waveform.
         this.ctx = new AudioContext();
+
+        /*
+         * Android WebView starts AudioContexts suspended until a
+         * user gesture; the record button click counts, but the
+         * promise must resolve before the analyser is read,
+         * otherwise the waveform stays flat and timing looks dead.
+         */
+        if (this.ctx.state === 'suspended') {
+            void this.ctx.resume();
+        }
+
         const source = this.ctx.createMediaStreamSource(this.stream!);
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 512;
