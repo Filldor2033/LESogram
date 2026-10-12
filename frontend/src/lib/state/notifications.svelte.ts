@@ -3,6 +3,10 @@ import {
 } from '$lib/i18n/i18n.svelte';
 
 import {
+    isNativeApp
+} from '$lib/utils/platform';
+
+import {
     authState
 } from '$lib/state/auth.svelte';
 
@@ -26,6 +30,15 @@ class NotificationsState {
     );
 
     get supported(): boolean {
+        /*
+         * The Capacitor WebView has no DOM Notification API, but
+         * the @capacitor/local-notifications plugin provides native
+         * ones — so the feature is supported in the app too.
+         */
+        if (isNativeApp()) {
+            return true;
+        }
+
         return (
             typeof window !== 'undefined' &&
             'Notification' in window
@@ -47,6 +60,69 @@ class NotificationsState {
             );
 
             return 'disabled';
+        }
+
+        if (isNativeApp()) {
+            /*
+             * Native path: request through the plugin. Android 13+
+             * additionally needs the runtime POST_NOTIFICATIONS
+             * grant MainActivity asks for on launch.
+             */
+            const cap = (
+                window as unknown as {
+                    Capacitor?: {
+                        Plugins?: {
+                            LocalNotifications?: {
+                                requestPermissions: () => Promise<{
+                                    display?: string;
+                                }>;
+                            };
+                        };
+                        isPluginAvailable?: (name: string) => boolean;
+                    };
+                }
+            ).Capacitor;
+
+            const plugin =
+                cap?.Plugins?.LocalNotifications;
+
+            if (!plugin) {
+                return 'unsupported';
+            }
+
+            try {
+                const status =
+                    await plugin.requestPermissions();
+
+                if (status.display !== 'granted') {
+                    this.enabled = false;
+
+                    localStorage.setItem(
+                        'notifications_enabled',
+                        '0'
+                    );
+
+                    return 'denied';
+                }
+            } catch {
+                this.enabled = false;
+
+                localStorage.setItem(
+                    'notifications_enabled',
+                    '0'
+                );
+
+                return 'denied';
+            }
+
+            this.enabled = true;
+
+            localStorage.setItem(
+                'notifications_enabled',
+                '1'
+            );
+
+            return 'enabled';
         }
 
         const permission =
@@ -75,6 +151,11 @@ class NotificationsState {
     }
 
     get allowed(): boolean {
+        if (isNativeApp()) {
+            // The plugin path has no DOM permission to check.
+            return this.enabled && document.hidden;
+        }
+
         return (
             this.enabled &&
             this.supported &&
@@ -107,6 +188,38 @@ class NotificationsState {
             message.text ||
             message.file_name ||
             t('attachmentLabel');
+
+        if (isNativeApp()) {
+            const cap = (
+                window as unknown as {
+                    Capacitor?: {
+                        Plugins?: {
+                            LocalNotifications?: {
+                                show: (options: {
+                                    title: string;
+                                    body: string;
+                                    id: number;
+                                }) => Promise<void>;
+                            };
+                        };
+                    };
+                }
+            ).Capacitor;
+
+            cap?.Plugins?.LocalNotifications?.show({
+                title: t(
+                    'newMessageTitle',
+                    { room }
+                ),
+                body,
+                id: message.id ??
+                    Math.floor(
+                        Date.now() / 1000
+                    )
+            });
+
+            return;
+        }
 
         new Notification(
             t(

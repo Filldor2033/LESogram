@@ -20,27 +20,38 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         /*
-         * Branded chrome: deep slate bars with a green accent edge.
-         * The status bar (camera cutout area) and the navigation bar
-         * (gesture/button strip) sit on the panel color #0f172a with
-         * a 2px green #22c55e bottom/top line drawn via the window
-         * background — the web layer cannot paint behind system bars
-         * once edge-to-edge is off, so the color comes from here.
+         * Android 15+ (targetSdk 35+) forces edge-to-edge and IGNORES
+         * setStatusBarColor — the bars stay translucent gray. Instead:
+         * draw behind the bars ourselves. The window background
+         * (panel slate #0f172a) shows through the now-transparent
+         * status/navigation bars, and the WebView content already
+         * respects env(safe-area-inset-*) paddings in CSS.
          */
         getWindow().setStatusBarColor(
-            android.graphics.Color.parseColor("#0f172a"));
+            android.graphics.Color.TRANSPARENT);
         getWindow().setNavigationBarColor(
-            android.graphics.Color.parseColor("#0f172a"));
+            android.graphics.Color.TRANSPARENT);
+        getWindow().setBackgroundDrawable(
+            new android.graphics.drawable.ColorDrawable(
+                android.graphics.Color.parseColor("#0f172a")));
 
         /*
-         * Light (white) icons on the dark bars: clear the LIGHT
-         * flags — their presence would request dark icons.
+         * Light (white) icons on the dark background:
+         * WindowInsetsController is the modern API (35+); the
+         * legacy system-ui flags cover older versions.
          */
-        final android.view.View decor = getWindow().getDecorView();
+        final android.view.Window window = getWindow();
+        final android.view.View decor = window.getDecorView();
         decor.setSystemUiVisibility(
             decor.getSystemUiVisibility()
             & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
             & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        androidx.core.view.WindowCompat
+            .getInsetsController(window, decor)
+            .setAppearanceLightStatusBars(false);
+        androidx.core.view.WindowCompat
+            .getInsetsController(window, decor)
+            .setAppearanceLightNavigationBars(false);
 
         /*
          * Voice messages: the WebView's getUserMedia fires the runtime

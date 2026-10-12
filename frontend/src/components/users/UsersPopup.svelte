@@ -81,15 +81,12 @@
                         <div class="user-item">
                             <Avatar
                                 username={user.username}
-                                displayName={user.display_name}
-                                url={user.avatar_url}
                                 size={38}
                                 clickToProfile={true}
                             />
 
                             <div class="user-name">
-                                {user.display_name ||
-                                    user.username}
+                                {user.username}
                             </div>
 
                             <div class="user-badges">
