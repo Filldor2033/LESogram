@@ -15,6 +15,17 @@ export class VoiceRecorder {
     private stream: MediaStream | null = null;
     private recorder: MediaRecorder | null = null;
     private chunks: Blob[] = [];
+
+    /*
+     * WebAudio PCM fallback (Android WebView): several devices
+     * report MediaRecorder support but fail mid-recording, or
+     * produce empty blobs. We tee the stream into a
+     * ScriptProcessorNode collecting Float32 PCM and, when the
+     * MediaRecorder path yields nothing, encode it to WAV.
+     */
+    private pcm: Float32Array[] = [];
+    private pcmNode: ScriptProcessorNode | null = null;
+    private usingPcm = false;
     private ctx: AudioContext | null = null;
     private analyser: AnalyserNode | null = null;
     private intervalId: number | null = null;
@@ -80,22 +91,43 @@ export class VoiceRecorder {
             audio: true
         });
 
-        const mimeType = VoiceRecorder.pickMimeType();
-        this.recorder = mimeType
-            ? new MediaRecorder(this.stream, { mimeType })
-            : new MediaRecorder(this.stream);
+        this.usingPcm = false;
 
-        this.recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) {
-                this.chunks.push(e.data);
-            }
-        };
+        try {
+            const mimeType = VoiceRecorder.pickMimeType();
+            this.recorder = mimeType
+                ? new MediaRecorder(this.stream, { mimeType })
+                : new MediaRecorder(this.stream);
 
-        this.recorder.start(250);
+            this.recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    this.chunks.push(e.data);
+                }
+            };
+
+            this.recorder.onerror = () => {
+                // Broken MediaRecorder (common on Android WebView):
+                // switch to the PCM path; collected chunks may be
+                // garbage — drop them.
+                this.chunks = [];
+                this.usingPcm = true;
+                this.startPcmCapture();
+            };
+
+            this.recorder.start(250);
+        } catch {
+            // MediaRecorder constructor failed — PCM fallback.
+            this.recorder = null;
+            this.usingPcm = true;
+        }
+
         this.startedAt = performance.now();
         this.pausedTotal = 0;
 
         this.setupAnalyser();
+        if (this.usingPcm) {
+            this.startPcmCapture();
+        }
     }
 
     private setupAnalyser(): void {
@@ -146,6 +178,79 @@ export class VoiceRecorder {
                 }
             }
         }, 50);
+    }
+
+    /**
+     * Collects Float32 PCM frames from a ScriptProcessorNode.
+     * Used as the recording path on devices where MediaRecorder
+     * is broken (notably many Android WebViews).
+     */
+    private startPcmCapture(): void {
+        if (!this.ctx || !this.stream || this.pcmNode) {
+            return;
+        }
+
+        const source = this.ctx.createMediaStreamSource(this.stream);
+        const node = this.ctx.createScriptProcessor(4096, 1, 1);
+
+        node.onaudioprocess = (event) => {
+            if (this.stopped || this.paused) return;
+
+            const input = event.inputBuffer.getChannelData(0);
+            this.pcm.push(new Float32Array(input));
+        };
+
+        source.connect(node);
+        // A destination connection keeps the graph pulled on
+        // some WebViews even when nothing is audible.
+        node.connect(this.ctx.destination);
+        this.pcmNode = node;
+    }
+
+    /**
+     * Encodes the collected PCM frames into a 16-bit WAV blob.
+     */
+    private pcmToWav(): Blob {
+        const sampleRate = this.ctx?.sampleRate || 48000;
+
+        let total = 0;
+        for (const chunk of this.pcm) {
+            total += chunk.length;
+        }
+
+        const buffer = new ArrayBuffer(44 + total * 2);
+        const view = new DataView(buffer);
+
+        const writeString = (offset: number, text: string) => {
+            for (let i = 0; i < text.length; i++) {
+                view.setUint8(offset + i, text.charCodeAt(i));
+            }
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + total * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);        // PCM
+        view.setUint16(22, 1, true);        // mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, total * 2, true);
+
+        let offset = 44;
+        for (const chunk of this.pcm) {
+            for (let i = 0; i < chunk.length; i++) {
+                const clamped = Math.max(-1, Math.min(1, chunk[i]));
+                view.setInt16(offset, clamped * 0x7fff, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
     }
 
     paused = false;
@@ -250,16 +355,26 @@ export class VoiceRecorder {
             rec.stop();
         });
 
+        /*
+         * Android WebView safety net: a "working" MediaRecorder
+         * can still produce an empty blob — fall back to the
+         * collected PCM and encode WAV.
+         */
+        let result = blob;
+        if (result.size === 0 && this.pcm.length > 0) {
+            result = this.pcmToWav();
+        }
+
         this.cleanup();
 
-        if (blob.size === 0 || durationSec < 0.4) {
+        if (result.size === 0 || durationSec < 0.4) {
             return null;
         }
 
         // Resample amplitude track to a fixed bar count
         const waveform = resample(this.amplitude, TARGET_SAMPLES);
 
-        return { blob, durationSec, waveform };
+        return { blob: result, durationSec, waveform };
     }
 
     /**
@@ -298,6 +413,16 @@ export class VoiceRecorder {
         this.stream?.getTracks().forEach((t) => t.stop());
         this.stream = null;
         this.recorder = null;
+
+        if (this.pcmNode) {
+            try {
+                this.pcmNode.disconnect();
+            } catch {
+                // ignore
+            }
+            this.pcmNode = null;
+        }
+        this.pcm = [];
 
         void this.ctx?.close().catch(() => undefined);
         this.ctx = null;
