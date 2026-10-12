@@ -142,16 +142,16 @@ select {
     cursor: pointer;
 
     /*
-     * Telegram-style quote sizing: --reply-w is set by
-     * MessageReply from the quoted bubble's live width. The
-     * quote NEVER stretches the replying bubble: the bubble
-     * sizes to its own content (fit-content), and the quote
-     * is capped at the quoted message's width via max-width.
-     * So a short reply to a long message keeps the quote
-     * wide (capped by the quoted bubble), and a long reply
-     * to a short message grows past the quote naturally.
+     * Telegram-style quote: the quote spans the full width
+     * of the replying bubble (flex-column stretch), and the
+     * single-line ellipsis text sets the bubble's intrinsic
+     * width — quoting a long message widens the replying
+     * bubble up to the quoted message's width, quoting a
+     * short one keeps it narrow. The replying bubble's own
+     * text can still grow it further (fit-content).
      */
-    max-width: var(--reply-w, 100%);
+    align-self: stretch;
+    max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
 }
