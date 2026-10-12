@@ -87,9 +87,7 @@ export class VoiceRecorder {
          * everywhere; echo cancellation is off but that is a fair
          * trade for reliability.
          */
-        this.stream = await navigator.mediaDevices.getUserMedia({
-            audio: true
-        });
+        this.stream = await this.openMicWithRetry();
 
         this.usingPcm = false;
 
@@ -178,6 +176,40 @@ export class VoiceRecorder {
                 }
             }
         }, 50);
+    }
+
+    /**
+     * Opens the microphone, retrying once on NotReadableError.
+     *
+     * On Android WebView (notably Xiaomi / Android 15) the very
+     * first AudioRecord session after a failed attempt returns
+     * "Could not start audio source" while the previous session
+     * is still being torn down — a short back-off and a second
+     * attempt open it reliably.
+     */
+    private async openMicWithRetry(): Promise<MediaStream> {
+        const open = () =>
+            navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+        try {
+            return await open();
+        } catch (err) {
+            if (
+                err instanceof DOMException &&
+                (err.name === 'NotReadableError' ||
+                    err.name === 'AbortError')
+            ) {
+                await new Promise((resolve) => {
+                    window.setTimeout(resolve, 350);
+                });
+
+                return open();
+            }
+
+            throw err;
+        }
     }
 
     /**
