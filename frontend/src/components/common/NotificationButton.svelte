@@ -4,6 +4,10 @@
     } from '$lib/state/notifications.svelte';
 
     import {
+        isNativeApp
+    } from '$lib/utils/platform';
+
+    import {
         composerState
     } from '$lib/state/composer.svelte';
 
@@ -42,7 +46,9 @@
 
             case 'denied':
                 composerState.setStatus(
-                    'notificationsDenied',
+                    isNativeApp()
+                        ? 'notificationsBlockedApp'
+                        : 'notificationsDenied',
                     {},
                     true
                 );

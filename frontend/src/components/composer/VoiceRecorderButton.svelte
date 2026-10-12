@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
 
+    import { isNativeApp } from '$lib/utils/platform';
+
     import { fly } from 'svelte/transition';
 
     import Icon from '$components/common/Icon.svelte';
@@ -153,7 +155,11 @@
                 switch (err.name) {
                     case 'NotAllowedError':
                     case 'SecurityError':
-                        onError('voiceMicBlocked');
+                        onError(
+                            isNativeApp()
+                                ? 'voiceMicBlockedApp'
+                                : 'voiceMicBlocked'
+                        );
                         break;
                     case 'NotFoundError':
                         onError('voiceNoDevice');
