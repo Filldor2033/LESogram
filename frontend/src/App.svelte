@@ -13,6 +13,9 @@
     import ProfileCard
         from '$components/profile/ProfileCard.svelte';
 
+    import DebugBar
+        from '$components/common/DebugBar.svelte';
+
     import AuthPanel
         from '$components/auth/AuthPanel.svelte';
 
@@ -176,4 +179,5 @@
 
     <ProfileModal />
     <ProfileCard />
+    <DebugBar />
 </div>
