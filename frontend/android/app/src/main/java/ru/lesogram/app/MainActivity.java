@@ -13,7 +13,6 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Bridge;
-import com.getcapacitor.BridgeWebView;
 
 public class MainActivity extends BridgeActivity {
 
