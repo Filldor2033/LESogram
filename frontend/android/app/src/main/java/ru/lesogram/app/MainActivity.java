@@ -4,11 +4,16 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.PermissionRequest;
+
+import com.getcapacitor.BridgeWebChromeClient;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.Bridge;
+import com.getcapacitor.BridgeWebView;
 
 public class MainActivity extends BridgeActivity {
 
@@ -61,11 +66,47 @@ public class MainActivity extends BridgeActivity {
         ensureMicPermission();
 
         /*
+         * Robust getUserMedia grant: Capacitor's own WebChromeClient
+         * routes onPermissionRequest through a single-slot listener
+         * that can drop the grant (observed as NotAllowedError
+         * "Permission denied" on Android 15 WebView with RECORD_AUDIO
+         * fully granted). Install our client on top: when the WebView
+         * asks for audio capture and the native permission is granted,
+         * answer immediately.
+         */
+        /*
+         * Subclass Capacitor's client so all its behavior (alerts,
+         * file choosers, console relay) stays intact — we only take
+         * over the audio permission answer.
+         */
+        getBridge().getWebView().setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                final boolean audio =
+                    java.util.Arrays.asList(request.getResources())
+                        .contains("android.webkit.resource.AUDIO_CAPTURE");
+
+                if (audio && micGranted()) {
+                    request.grant(request.getResources());
+                } else {
+                    super.onPermissionRequest(request);
+                }
+            }
+        });
+
+        /*
          * Android 13+: notification permission is runtime. Ask once on
          * launch so background message notifications can appear; a deny
          * (or "don't ask again") is non-fatal — the app keeps working.
          */
         ensureNotificationPermission();
+    }
+
+    private boolean micGranted() {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void ensureMicPermission() {
