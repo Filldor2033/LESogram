@@ -151,6 +151,22 @@
         } catch (err) {
             console.error('[voice] getUserMedia failed:', err);
 
+            /*
+             * Debug visibility: in the app the exact failure is
+             * invisible to the user (no devtools). Report it back
+             * home via the debug beacon the debug build watches.
+             */
+            console.error(
+                '[voice][debug]',
+                JSON.stringify({
+                    platform: isNativeApp() ? 'native' : 'web',
+                    name: err instanceof Error ? err.name : typeof err,
+                    message: err instanceof Error ? err.message : String(err),
+                    secure: window.isSecureContext,
+                    ua: navigator.userAgent
+                })
+            );
+
             if (err instanceof DOMException) {
                 switch (err.name) {
                     case 'NotAllowedError':
@@ -166,7 +182,11 @@
                         break;
                     case 'NotReadableError':
                     case 'OverconstrainedError':
-                        onError('voiceMicBusy');
+                        onError(
+                            isNativeApp()
+                                ? 'voiceMicBusyApp'
+                                : 'voiceMicBusy'
+                        );
                         break;
                     default:
                         onError('voiceMicDenied');
