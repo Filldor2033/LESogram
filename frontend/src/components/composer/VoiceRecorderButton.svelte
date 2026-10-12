@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
 
+    import { isNativeApp } from '$lib/utils/platform';
+
     import { fly } from 'svelte/transition';
 
     import Icon from '$components/common/Icon.svelte';
@@ -9,7 +11,6 @@
         VoiceRecorder,
         concatVoiceToWav,
         formatVoiceDuration,
-        isNativeApp,
         resampleWave,
         trimVoiceToWav
     } from '$lib/utils/voice-recorder';

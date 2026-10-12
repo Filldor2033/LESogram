@@ -13,6 +13,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private static final int REQ_MIC = 41;
+    private static final int REQ_NOTIF = 42;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -28,6 +29,13 @@ public class MainActivity extends BridgeActivity {
          * asking first avoids the confusing double-deny flow.
          */
         ensureMicPermission();
+
+        /*
+         * Android 13+: notification permission is runtime. Ask once on
+         * launch so background message notifications can appear; a deny
+         * (or "don't ask again") is non-fatal — the app keeps working.
+         */
+        ensureNotificationPermission();
     }
 
     private void ensureMicPermission() {
@@ -39,6 +47,21 @@ public class MainActivity extends BridgeActivity {
                 this,
                 new String[]{Manifest.permission.RECORD_AUDIO},
                 REQ_MIC
+        );
+    }
+
+    private void ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                REQ_NOTIF
         );
     }
 }
